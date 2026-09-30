@@ -1,4 +1,4 @@
-package com.nextworks.unextwebservices.security;
+package com.nextworks.unextwebservices.service;
 
 import com.nextworks.unextwebservices.dto.AuthResponseDTO;
 import com.nextworks.unextwebservices.dto.LoginRequestDTO;
