@@ -1,6 +1,8 @@
 package com.nextworks.unextwebservices.controller;
 
+import com.nextworks.unextwebservices.dto.InstitutionProfileRequestDTO;
 import com.nextworks.unextwebservices.dto.PostulantProfileRequestDTO;
+import com.nextworks.unextwebservices.dto.RecruiterProfileRequestDTO;
 import com.nextworks.unextwebservices.service.ProfileService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -22,5 +24,21 @@ public class ProfileController {
             @Valid @RequestBody PostulantProfileRequestDTO request) {
 
         return ResponseEntity.ok(profileService.createPostulantProfile(userId, request));
+    }
+
+    @PostMapping("/recruiter/{userId}")
+    public ResponseEntity<String> createRecruiterProfile(
+            @PathVariable UUID userId,
+            @Valid @RequestBody RecruiterProfileRequestDTO request) {
+
+        return ResponseEntity.ok(profileService.createRecruiterProfile(userId, request));
+    }
+
+    @PostMapping("/institution/{userId}")
+    public ResponseEntity<String> createInstitutionProfile(
+            @PathVariable UUID userId,
+            @Valid @RequestBody InstitutionProfileRequestDTO request) {
+
+        return ResponseEntity.ok(profileService.createInstitutionProfile(userId, request));
     }
 }
