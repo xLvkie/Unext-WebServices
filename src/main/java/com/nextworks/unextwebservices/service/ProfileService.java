@@ -3,6 +3,8 @@ package com.nextworks.unextwebservices.service;
 import com.nextworks.unextwebservices.dto.InstitutionProfileRequestDTO;
 import com.nextworks.unextwebservices.dto.PostulantProfileRequestDTO;
 import com.nextworks.unextwebservices.dto.RecruiterProfileRequestDTO;
+import com.nextworks.unextwebservices.dto.PostulantProfileResponseDTO;
+import com.nextworks.unextwebservices.dto.PostulantProfileUpdateDTO;
 
 import com.nextworks.unextwebservices.entity.InstitutionProfile;
 import com.nextworks.unextwebservices.entity.PostulantProfile;
@@ -28,6 +30,9 @@ public class ProfileService {
     private final RecruiterProfileRepository recruiterRepository;
     private final InstitutionProfileRepository institutionRepository;
 
+    /* ==================================
+    // Creación del perfil del postulante
+    // ================================== */
     @Transactional
     public String createPostulantProfile(UUID userId, PostulantProfileRequestDTO request) {
         // 1. Buscar al usuario
@@ -60,6 +65,9 @@ public class ProfileService {
         return "Perfil de postulante creado exitosamente";
     }
 
+    /* ==================================
+    // Creación del perfil del reclutador
+    // ================================== */
     @Transactional
     public String createRecruiterProfile(UUID userId, RecruiterProfileRequestDTO request) {
         User user = userRepository.findById(userId)
@@ -86,6 +94,9 @@ public class ProfileService {
         return "Perfil de reclutador creado exitosamente";
     }
 
+    /* ===================================
+    // Creación del perfil del institucion
+    // =================================== */
     @Transactional
     public String createInstitutionProfile(UUID userId, InstitutionProfileRequestDTO request) {
         User user = userRepository.findById(userId)
@@ -111,5 +122,54 @@ public class ProfileService {
         userRepository.save(user);
 
         return "Perfil de institución creado exitosamente";
+    }
+
+    /* ===================================
+    // Mostrar datos del perfil postulante
+    // =================================== */
+    @Transactional(readOnly = true)
+    public PostulantProfileResponseDTO getMyPostulantProfile(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        PostulantProfile profile = postulantRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new RuntimeException("Perfil de postulante no encontrado"));
+
+        return PostulantProfileResponseDTO.builder()
+                .id(profile.getId())
+                .firstName(profile.getFirstName())
+                .lastName(profile.getLastName())
+                .studentCode(profile.getStudentCode())
+                .career(profile.getCareer())
+                .currentCycle(profile.getCurrentCycle())
+                .cvUrl(profile.getCvUrl())
+                .headline(profile.getHeadline())
+                .bio(profile.getBio())
+                .hasUniversityBase(profile.getHasUniversityBase())
+                .build();
+    }
+
+    /* ===================================
+    // Editar datos del perfil postulante
+    // =================================== */
+    @Transactional
+    public PostulantProfileResponseDTO updateMyPostulantProfile(String email, PostulantProfileUpdateDTO request) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        PostulantProfile profile = postulantRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new RuntimeException("Perfil de postulante no encontrado"));
+
+        // Actualizamos solo los campos permitidos si vienen en la petición
+        if (request.getCareer() != null) profile.setCareer(request.getCareer());
+        if (request.getCurrentCycle() != null) profile.setCurrentCycle(request.getCurrentCycle());
+        if (request.getCvUrl() != null) profile.setCvUrl(request.getCvUrl());
+        if (request.getHeadline() != null) profile.setHeadline(request.getHeadline());
+        if (request.getBio() != null) profile.setBio(request.getBio());
+
+        postulantRepository.save(profile);
+
+        // Reutilizamos el método anterior para devolver el perfil actualizado
+        return getMyPostulantProfile(email);
     }
 }
