@@ -2,8 +2,6 @@ package com.nextworks.unextwebservices.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
-
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -21,34 +19,32 @@ public class AcademicValidation {
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "postulant_id", nullable = false)
-    private PostulantProfile postulant;
+    @JoinColumn(name = "postulant_profile_id", nullable = false)
+    private PostulantProfile postulantProfile;
 
+    // Relación con la Institución a la que se le pide la validación
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "institution_id", nullable = false)
-    private InstitutionProfile institution;
+    @JoinColumn(name = "institution_profile_id", nullable = false)
+    private InstitutionProfile institutionProfile;
 
-    @Column(nullable = false, length = 150)
-    private String title;
+    @Column(name = "knowledge_title", nullable = false, length = 150)
+    private String knowledgeTitle;
 
-    @Column(nullable = false, length = 50)
-    private String category;
-
-    @Column(name = "evidence_url", columnDefinition = "TEXT")
+    @Column(name = "evidence_url", nullable = false)
     private String evidenceUrl;
 
     @Enumerated(EnumType.STRING)
-    @Column(length = 50)
-    @Builder.Default
-    private ValidationStatus status = ValidationStatus.PENDING;
+    @Column(nullable = false, length = 20)
+    private ValidationStatus status;
 
-    @Column(name = "feedback_notes", columnDefinition = "TEXT")
-    private String feedbackNotes;
-
-    @Column(name = "reviewed_at")
-    private LocalDateTime reviewedAt;
-
-    @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
+
+    @PrePersist
+    protected void onCreate() {
+        this.createdAt = LocalDateTime.now();
+        if (this.status == null) {
+            this.status = ValidationStatus.PENDING;
+        }
+    }
 }

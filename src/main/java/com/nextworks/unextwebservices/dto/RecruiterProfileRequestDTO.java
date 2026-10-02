@@ -6,12 +6,12 @@ import lombok.Data;
 @Data
 
 public class RecruiterProfileRequestDTO {
-    @NotBlank(message = "El nombre de la compañia es obligatorio")
+    @NotBlank(message = "El nombre de la compañía es obligatorio")
     private String companyName;
 
-    @NotBlank(message = "El ruc es obligatorio")
+    @NotBlank(message = "El RUC es obligatorio")
     private String ruc;
 
-    private String corporatePosition;
-    private String businessSector;
+    private String industry;
+    private String description;
 }
