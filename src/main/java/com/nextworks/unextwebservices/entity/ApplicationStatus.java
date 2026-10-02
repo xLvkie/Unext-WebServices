@@ -2,7 +2,7 @@ package com.nextworks.unextwebservices.entity;
 
 public enum ApplicationStatus {
     RECEIVED,
-    IN_REVIEW,
+    UNDER_REVIEW,
     ACCEPTED,
     REJECTED
 }
