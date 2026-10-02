@@ -15,6 +15,9 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/validations")
 @RequiredArgsConstructor
+
+// http://localhost:8080/
+
 public class ValidationController {
 
     private final ValidationService validationService;
@@ -26,11 +29,20 @@ public class ValidationController {
 
         User user = (User) authentication.getPrincipal();
         return ResponseEntity.ok(validationService.requestValidation(user.getEmail(), request));
+        /*
+        Para completar una solicitud de revision de habilidades se requiere completar los campos:
+        institutionProfileId(!), knowledgeTitle(!) y evidenceUrl(!)
+
+        # institutionProfileId no es el userId si no id (PK)
+         */
     }
 
     @GetMapping("/me")
     public ResponseEntity<List<ValidationResponseDTO>> getMyValidations(Authentication authentication) {
         User user = (User) authentication.getPrincipal();
         return ResponseEntity.ok(validationService.getMyValidations(user.getEmail()));
+        /*
+        Se requiere uso del bearer mediante el token del usuario
+         */
     }
 }

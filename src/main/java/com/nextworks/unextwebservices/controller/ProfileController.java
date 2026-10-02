@@ -17,6 +17,9 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/profiles")
 @RequiredArgsConstructor
+
+// http://localhost:8080/
+
 public class ProfileController {
 
     private final ProfileService profileService;
@@ -30,6 +33,10 @@ public class ProfileController {
             @Valid @RequestBody PostulantProfileRequestDTO request) {
 
         return ResponseEntity.ok(profileService.createPostulantProfile(userId, request));
+        /*
+        Para completar el perfil postulante se requiere completar los campos: firstName(!), lastName(!),
+        studentCode, career y currentCycle.
+         */
     }
 
     @PostMapping("/recruiter/{userId}")
@@ -38,6 +45,10 @@ public class ProfileController {
             @Valid @RequestBody RecruiterProfileRequestDTO request) {
 
         return ResponseEntity.ok(profileService.createRecruiterProfile(userId, request));
+        /*
+        Para completar el perfil reclutador se requiere completar los campos: companyName(!), ruc(!),
+        industry y description.
+         */
     }
 
     @PostMapping("/institution/{userId}")
@@ -46,6 +57,9 @@ public class ProfileController {
             @Valid @RequestBody InstitutionProfileRequestDTO request) {
 
         return ResponseEntity.ok(profileService.createInstitutionProfile(userId, request));
+        /*
+        Para completar el perfil institucional se requiere completar los campos: institutionName(!) y domain(!)
+         */
     }
 
     /* ========================
@@ -58,6 +72,9 @@ public class ProfileController {
         String email = user.getEmail();
 
         return ResponseEntity.ok(profileService.getMyPostulantProfile(email));
+        /*
+        Se debe hacer uso del bearer token del usuario
+         */
     }
 
     @PutMapping("/postulant/me")
@@ -70,6 +87,9 @@ public class ProfileController {
         String email = user.getEmail();
 
         return ResponseEntity.ok(profileService.updateMyPostulantProfile(email, request));
+        /*
+        Campos modificables: career, currentCycle, cvUrl, headline y bio
+         */
     }
 
     @GetMapping("/recruiter/me")
@@ -79,6 +99,9 @@ public class ProfileController {
         String email = user.getEmail();
 
         return ResponseEntity.ok(profileService.getMyRecruiterProfile(email));
+        /*
+        Se debe hacer uso del bearer token del usuario
+         */
     }
 
     @PutMapping("/recruiter/me")
@@ -91,6 +114,9 @@ public class ProfileController {
         String email = user.getEmail();
 
         return ResponseEntity.ok(profileService.updateMyRecruiterProfile(email, request));
+        /*
+        Campos modificables: companyName, industry y description
+         */
     }
 
     @GetMapping("/institution/me")
@@ -100,6 +126,9 @@ public class ProfileController {
         String email = user.getEmail();
 
         return ResponseEntity.ok(profileService.getMyInstitutionProfile(email));
+        /*
+        Se debe hacer uso del bearer token del usuario
+         */
     }
 
     @PutMapping("/institution/me")
@@ -112,6 +141,9 @@ public class ProfileController {
         String email = user.getEmail();
 
         return ResponseEntity.ok(profileService.updateMyInstitutionProfile(email, request));
+        /*
+        Campos modificables: name, domain, logoUrl y description
+         */
     }
 
     /* ========================
@@ -124,12 +156,18 @@ public class ProfileController {
 
         User user = (User) authentication.getPrincipal();
         return ResponseEntity.ok(profileService.addSkill(user.getEmail(), request));
+        /*
+        Para completar una habilidad tecnica se requiere completar los campos: name(!) y masteryLevel(!)
+         */
     }
 
     @GetMapping("/postulant/me/skills")
     public ResponseEntity<List<StudentSkillResponseDTO>> getMySkills(Authentication authentication) {
         User user = (User) authentication.getPrincipal();
         return ResponseEntity.ok(profileService.getMySkills(user.getEmail()));
+        /*
+        Se debe hacer uso del bearer token del usuario
+         */
     }
 
     @PutMapping("/postulant/me/skills/{skillId}")
@@ -140,6 +178,9 @@ public class ProfileController {
 
         User user = (User) authentication.getPrincipal();
         return ResponseEntity.ok(profileService.updateSkill(user.getEmail(), skillId, request));
+        /*
+        Campos modificables: name y masteryLevel
+         */
     }
 
     @DeleteMapping("/postulant/me/skills/{skillId}")
@@ -150,5 +191,8 @@ public class ProfileController {
         User user = (User) authentication.getPrincipal();
         profileService.deleteSkill(user.getEmail(), skillId);
         return ResponseEntity.noContent().build();
+        /*
+        Se debe hacer uso del bearer token del usuario
+         */
     }
 }
