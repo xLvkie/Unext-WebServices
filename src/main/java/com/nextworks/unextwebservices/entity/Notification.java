@@ -2,8 +2,6 @@ package com.nextworks.unextwebservices.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
-
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -19,7 +17,7 @@ public class Notification {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
-
+    
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
@@ -28,16 +26,19 @@ public class Notification {
     private String title;
 
     @Column(nullable = false, columnDefinition = "TEXT")
-    private String message;
-
-    @Column(name = "action_url", length = 255)
-    private String actionUrl;
+    private String content;
 
     @Column(name = "is_read")
-    @Builder.Default
-    private Boolean isRead = false;
+    private Boolean isRead;
 
-    @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
+
+    @PrePersist
+    protected void onCreate() {
+        this.createdAt = LocalDateTime.now();
+        if (this.isRead == null) {
+            this.isRead = false; // Nace como no leída
+        }
+    }
 }
