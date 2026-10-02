@@ -38,4 +38,10 @@ public class JobController {
         User user = (User) authentication.getPrincipal();
         return ResponseEntity.ok(jobService.applyToJob(user.getEmail(), jobId));
     }
+
+    @GetMapping("/applications/me")
+    public ResponseEntity<List<ApplicationResponseDTO>> getMyApplications(Authentication authentication) {
+        User user = (User) authentication.getPrincipal();
+        return ResponseEntity.ok(jobService.getMyApplications(user.getEmail()));
+    }
 }

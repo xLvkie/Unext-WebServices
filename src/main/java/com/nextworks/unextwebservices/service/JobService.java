@@ -59,7 +59,7 @@ public class JobService {
         if (!offer.getIsActive()) {
             throw new RuntimeException("Esta vacante ya no acepta postulaciones");
         }
-        
+
         if (applicationRepository.existsByJobOfferIdAndPostulantProfileId(offer.getId(), profile.getId())) {
             throw new RuntimeException("Ya has postulado a esta vacante anteriormente");
         }
@@ -78,5 +78,26 @@ public class JobService {
                 .status(application.getStatus())
                 .appliedAt(application.getCreatedAt())
                 .build();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ApplicationResponseDTO> getMyApplications(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        PostulantProfile profile = postulantRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new RuntimeException("Perfil de postulante no encontrado"));
+
+        List<JobApplication> applications = applicationRepository.findByPostulantProfileId(profile.getId());
+
+        return applications.stream()
+                .map(application -> ApplicationResponseDTO.builder()
+                        .id(application.getId()) // ¡Este es el ID de la postulación que el chat necesita!
+                        .jobTitle(application.getJobOffer().getTitle())
+                        .companyName(application.getJobOffer().getRecruiterProfile().getCompanyName())
+                        .status(application.getStatus())
+                        .appliedAt(application.getCreatedAt())
+                        .build())
+                .toList();
     }
 }
