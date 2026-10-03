@@ -128,4 +128,32 @@ public class ValidationService {
                 .build();
     }
 
+    @Transactional
+    public com.nextworks.unextwebservices.dto.ApplicationResponseDTO superviseAgreement(String email, UUID applicationId) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        InstitutionProfile institution = institutionRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new RuntimeException("Perfil de institución no encontrado. Solo las instituciones pueden supervisar convenios."));
+
+        com.nextworks.unextwebservices.entity.JobApplication application = jobApplicationRepository.findById(applicationId)
+                .orElseThrow(() -> new RuntimeException("Postulación no encontrada"));
+
+        // Generalmente solo se supervisan convenios cuando el alumno fue aceptado
+        if (application.getStatus() != com.nextworks.unextwebservices.entity.ApplicationStatus.ACCEPTED) {
+            throw new RuntimeException("Solo se pueden supervisar postulaciones que hayan sido aceptadas por la empresa");
+        }
+
+        application.setIsSupervisedByInstitution(true);
+        jobApplicationRepository.save(application);
+
+        return com.nextworks.unextwebservices.dto.ApplicationResponseDTO.builder()
+                .id(application.getId())
+                .jobTitle(application.getJobOffer().getTitle())
+                .companyName(application.getJobOffer().getRecruiterProfile().getCompanyName())
+                .status(application.getStatus())
+                .appliedAt(application.getCreatedAt())
+                .isSupervisedByInstitution(application.getIsSupervisedByInstitution())
+                .build();
+    }
 }
