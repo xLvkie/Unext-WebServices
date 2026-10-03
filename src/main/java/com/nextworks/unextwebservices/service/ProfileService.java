@@ -316,4 +316,26 @@ public class ProfileService {
 
         studentSkillRepository.delete(skill);
     }
+
+    @Transactional
+    public StudentSkillResponseDTO certifyStudentSkill(String email, UUID skillId) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        InstitutionProfile institution = institutionRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new RuntimeException("Perfil de institución no encontrado. Solo las instituciones pueden certificar habilidades."));
+
+        StudentSkill skill = studentSkillRepository.findById(skillId)
+                .orElseThrow(() -> new RuntimeException("Habilidad no encontrada"));
+
+        skill.setIsValidatedByInstitution(true);
+        studentSkillRepository.save(skill);
+
+        return StudentSkillResponseDTO.builder()
+                .id(skill.getId())
+                .name(skill.getName())
+                .masteryLevel(skill.getMasteryLevel())
+                .isValidatedByInstitution(skill.getIsValidatedByInstitution())
+                .build();
+    }
 }

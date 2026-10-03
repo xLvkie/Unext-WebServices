@@ -195,4 +195,20 @@ public class ProfileController {
         Se debe hacer uso del bearer token del usuario
          */
     }
+
+    /* =======================================
+    // CERTIFICACIÓN POR PARTE DE INSTITUCIONES
+    // ======================================= */
+    @PatchMapping("/institution/skills/{skillId}/certify")
+    public ResponseEntity<StudentSkillResponseDTO> certifyStudentSkill(
+            Authentication authentication,
+            @PathVariable UUID skillId) {
+
+        User user = (User) authentication.getPrincipal();
+        return ResponseEntity.ok(profileService.certifyStudentSkill(user.getEmail(), skillId));
+        /*
+        Endpoint para que una institución valide/certifique la habilidad técnica de un estudiante.
+        Cambia isValidatedByInstitution a true.
+         */
+    }
 }
