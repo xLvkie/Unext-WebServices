@@ -22,6 +22,7 @@ public class JobService {
     private final JobApplicationRepository applicationRepository;
     private final UserRepository userRepository;
     private final PostulantProfileRepository postulantRepository;
+    private final NotificationService notificationService;
 
     @Transactional(readOnly = true)
     public List<JobOfferResponseDTO> searchJobs(String keyword, JobModality modality, ExperienceLevel experience) {
@@ -70,6 +71,11 @@ public class JobService {
                 .build();
 
         applicationRepository.save(application);
+
+        User recruiterUser = offer.getRecruiterProfile().getUser();
+        String notifTitle = "Nueva postulación recibida";
+        String notifContent = "Tienes un nuevo candidato para la vacante: " + offer.getTitle();
+        notificationService.createNotification(recruiterUser, notifTitle, notifContent);
 
         return ApplicationResponseDTO.builder()
                 .id(application.getId())

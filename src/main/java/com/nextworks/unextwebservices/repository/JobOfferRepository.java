@@ -23,4 +23,5 @@ public interface JobOfferRepository extends JpaRepository<JobOffer, UUID> {
             @Param("modality") JobModality modality,
             @Param("experience") ExperienceLevel experience
     );
+    List<JobOffer> findByRecruiterProfileIdOrderByCreatedAtDesc(UUID recruiterProfileId);
 }
