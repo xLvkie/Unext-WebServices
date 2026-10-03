@@ -153,6 +153,7 @@ public class RecruiterService {
                         .companyName(profile.getCompanyName())
                         .status(app.getStatus())
                         .appliedAt(app.getCreatedAt())
+                        .isSupervisedByInstitution(app.getIsSupervisedByInstitution())
                         .build())
                 .toList();
     }

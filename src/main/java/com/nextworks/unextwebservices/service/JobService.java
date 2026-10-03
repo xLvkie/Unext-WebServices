@@ -83,6 +83,7 @@ public class JobService {
                 .companyName(offer.getRecruiterProfile().getCompanyName())
                 .status(application.getStatus())
                 .appliedAt(application.getCreatedAt())
+                .isSupervisedByInstitution(application.getIsSupervisedByInstitution())
                 .build();
     }
 
@@ -103,6 +104,7 @@ public class JobService {
                         .companyName(application.getJobOffer().getRecruiterProfile().getCompanyName())
                         .status(application.getStatus())
                         .appliedAt(application.getCreatedAt())
+                        .isSupervisedByInstitution(application.getIsSupervisedByInstitution())
                         .build())
                 .toList();
     }

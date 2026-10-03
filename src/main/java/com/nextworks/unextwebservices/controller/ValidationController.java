@@ -68,4 +68,5 @@ public class ValidationController {
         Endpoint para que la institución apruebe (APPROVED) o rechace (REJECTED) una solicitud de validación
          */
     }
+
 }

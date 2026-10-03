@@ -14,4 +14,5 @@ public class ApplicationResponseDTO {
     private String companyName;
     private ApplicationStatus status;
     private LocalDateTime appliedAt;
+    private Boolean isSupervisedByInstitution;
 }

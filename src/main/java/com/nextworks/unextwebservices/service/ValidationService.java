@@ -8,6 +8,7 @@ import com.nextworks.unextwebservices.entity.PostulantProfile;
 import com.nextworks.unextwebservices.entity.User;
 import com.nextworks.unextwebservices.repository.AcademicValidationRepository;
 import com.nextworks.unextwebservices.repository.InstitutionProfileRepository;
+import com.nextworks.unextwebservices.repository.JobApplicationRepository;
 import com.nextworks.unextwebservices.repository.PostulantProfileRepository;
 import com.nextworks.unextwebservices.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,7 @@ public class ValidationService {
     private final UserRepository userRepository;
     private final PostulantProfileRepository postulantRepository;
     private final InstitutionProfileRepository institutionRepository;
+    private final JobApplicationRepository jobApplicationRepository;
 
     @Transactional
     public ValidationResponseDTO requestValidation(String email, ValidationRequestDTO request) {
@@ -125,4 +127,5 @@ public class ValidationService {
                 .status(validation.getStatus())
                 .build();
     }
+
 }

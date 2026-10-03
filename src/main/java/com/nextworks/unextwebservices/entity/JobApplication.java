@@ -33,11 +33,17 @@ public class JobApplication {
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "is_supervised_by_institution")
+    private Boolean isSupervisedByInstitution;
+
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
         if (this.status == null) {
             this.status = ApplicationStatus.RECEIVED;
+        }
+        if (this.isSupervisedByInstitution == null) {
+            this.isSupervisedByInstitution = false;
         }
     }
 }
