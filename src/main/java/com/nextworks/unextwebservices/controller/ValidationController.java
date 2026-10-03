@@ -69,4 +69,15 @@ public class ValidationController {
          */
     }
 
+    @PatchMapping("/agreements/{applicationId}/supervise")
+    public ResponseEntity<com.nextworks.unextwebservices.dto.ApplicationResponseDTO> superviseAgreement(
+            Authentication authentication,
+            @PathVariable UUID applicationId) {
+
+        User user = (User) authentication.getPrincipal();
+        return ResponseEntity.ok(validationService.superviseAgreement(user.getEmail(), applicationId));
+        /*
+        Endpoint para que la institución supervise un convenio (postulación aceptada).
+         */
+    }
 }
