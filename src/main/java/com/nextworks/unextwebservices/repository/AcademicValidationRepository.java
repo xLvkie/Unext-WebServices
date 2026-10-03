@@ -10,4 +10,5 @@ import java.util.UUID;
 @Repository
 public interface AcademicValidationRepository extends JpaRepository<AcademicValidation, UUID> {
     List<AcademicValidation> findByPostulantProfileId(UUID postulantProfileId);
+    List<AcademicValidation> findByInstitutionProfileId(UUID institutionProfileId);
 }
