@@ -36,7 +36,6 @@ public class PostulantService {
         postulant.setIsInstitutionVerified(false);
         postulantRepository.save(postulant);
 
-        // Si tu InstitutionProfile usa otra variable para el nombre (ej. institutionName), cámbialo aquí
         return "Solicitud de vinculación enviada exitosamente a la institución.";
     }
 }

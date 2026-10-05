@@ -7,6 +7,7 @@ import com.nextworks.unextwebservices.service.InstitutionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -90,6 +91,7 @@ public class InstitutionController {
         return ResponseEntity.ok(institutionService.getDashboardStats(user.getEmail()));
     }
 
+    @PreAuthorize("hasAnyAuthority('POSTULANT', 'INSTITUTION', 'RECRUITER')")
     @GetMapping("/directory")
     public ResponseEntity<List<InstitutionDirectoryResponseDTO>> getAllInstitutions() {
         return ResponseEntity.ok(institutionService.getAllInstitutions());
@@ -99,12 +101,15 @@ public class InstitutionController {
          */
     }
 
+    @PreAuthorize("hasAuthority('INSTITUTION')")
     @GetMapping("/validations/pending")
     public ResponseEntity<List<PendingValidationResponseDTO>> getPendingSkillValidations(Authentication authentication) {
         User user = (User) authentication.getPrincipal();
+        assert user != null;
         return ResponseEntity.ok(institutionService.getPendingSkillValidations(user.getEmail()));
     }
 
+    @PreAuthorize("hasAuthority('INSTITUTION')")
     @PatchMapping("/validations/{validationId}/status")
     public ResponseEntity<String> updateSkillValidationStatus(
             Authentication authentication,
@@ -112,6 +117,7 @@ public class InstitutionController {
             @Valid @RequestBody ValidationUpdateRequestDTO request) {
 
         User user = (User) authentication.getPrincipal();
+        assert user != null;
         return ResponseEntity.ok(institutionService.updateSkillValidationStatus(user.getEmail(), validationId, request));
     }
 }

@@ -7,6 +7,7 @@ import com.nextworks.unextwebservices.service.ChatService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,12 +21,14 @@ public class ChatController {
 
     private final ChatService chatService;
 
+    @PreAuthorize("hasAnyAuthority('POSTULANT', 'INSTITUTION', 'RECRUITER')")
     @PostMapping("/send")
     public ResponseEntity<MessageResponseDTO> sendMessage(
             Authentication authentication,
             @Valid @RequestBody MessageRequestDTO request) {
 
         User user = (User) authentication.getPrincipal();
+        assert user != null;
         return ResponseEntity.ok(chatService.sendMessage(user.getEmail(), request));
         /*
         Para enviar un mensaje se pide rellenar los campos receiverId (!),
@@ -34,9 +37,11 @@ public class ChatController {
          */
     }
 
+    @PreAuthorize("hasAnyAuthority('POSTULANT', 'INSTITUTION', 'RECRUITER')")
     @GetMapping("/inbox")
     public ResponseEntity<List<MessageResponseDTO>> getInbox(Authentication authentication) {
         User user = (User) authentication.getPrincipal();
+        assert user != null;
         return ResponseEntity.ok(chatService.getInbox(user.getEmail()));
         /*
         Retorna una lista con los ultimos mensajes de todos los chats
@@ -44,12 +49,14 @@ public class ChatController {
          */
     }
 
+    @PreAuthorize("hasAnyAuthority('POSTULANT', 'INSTITUTION', 'RECRUITER')")
     @GetMapping("/history/{receiverId}")
     public ResponseEntity<List<MessageResponseDTO>> getChatHistory(
             Authentication authentication,
             @PathVariable UUID receiverId) {
 
         User user = (User) authentication.getPrincipal();
+        assert user != null;
         return ResponseEntity.ok(chatService.getChatHistory(user.getEmail(), receiverId));
         /*
         Retorna el historial de un chat mediante el id del que recibe el mensaje

@@ -14,7 +14,5 @@ public class MessageRequestDTO {
     @NotBlank(message = "El contenido del mensaje no puede estar vacío")
     private String content;
 
-    // Obligatorio por ahora, ya que estamos en el contexto de empleabilidad (no se implementan aún los demas segmentos)
-    @NotNull(message = "El ID de la postulación es obligatorio para este tipo de chat")
     private UUID jobApplicationId;
 }

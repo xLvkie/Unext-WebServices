@@ -29,16 +29,41 @@ public class ChatService {
         User receiver = userRepository.findById(request.getReceiverId())
                 .orElseThrow(() -> new RuntimeException("Destinatario no encontrado"));
 
-        JobApplication application = applicationRepository.findById(request.getJobApplicationId())
-                .orElseThrow(() -> new RuntimeException("Postulación no encontrada"));
-
-        // REGLA DE NEGOCIO ESTRICTA: El chat solo se habilita en UNDER_REVIEW
-        if (application.getStatus() != ApplicationStatus.UNDER_REVIEW) {
-            throw new RuntimeException("HTTP 403: No puedes enviar mensajes. La postulación no está en etapa de revisión.");
+        JobApplication application = null;
+        if (request.getJobApplicationId() != null) {
+            application = applicationRepository.findById(request.getJobApplicationId())
+                    .orElseThrow(() -> new RuntimeException("Postulación no encontrada"));
         }
 
+        // ==========================================
+        // REGLAS DE NEGOCIO: RESTRICCIONES DE CHAT
+        // ==========================================
+
+        String senderRole = sender.getRole().name();
+        String receiverRole = receiver.getRole().name();
+        // Validación al segmeto POSTULANTE
+        if (senderRole.equals("POSTULANT")) {
+            // Caso 1: Postulante -> Reclutador
+            if (receiverRole.equals("RECRUITER")) {
+                if (application == null) {
+                    throw new RuntimeException("HTTP 400: Se requiere el ID de una postulación para contactar a una empresa.");
+                }
+                if (application.getStatus() != ApplicationStatus.UNDER_REVIEW) {
+                    throw new RuntimeException("HTTP 403: No puedes enviar mensajes. La postulación no está en etapa de revisión.");
+                }
+            }
+            // Caso 2: Postulante -> Institución
+            else if (receiverRole.equals("INSTITUTION")) {
+                // TODO: Implementar lógica de conexión Postulante - Institución
+                throw new RuntimeException("HTTP 403: La validación de conexión con la institución aún no está configurada.");
+            }
+        }
+
+        // Determinar el contexto del chat para guardarlo (puede ser GENERAL si no hay postulación)
+        ChatContext context = (application != null) ? ChatContext.JOB_APPLICATION : ChatContext.GENERAL;
+
         Message message = Message.builder()
-                .contextType(ChatContext.JOB_APPLICATION)
+                .contextType(context)
                 .jobApplication(application)
                 .sender(sender)
                 .receiver(receiver)
@@ -70,7 +95,6 @@ public class ChatService {
         return history.stream().map(this::mapToDTO).toList();
     }
 
-    // Método auxiliar para no repetir código de mapeo
     private MessageResponseDTO mapToDTO(Message message) {
         return MessageResponseDTO.builder()
                 .id(message.getId())

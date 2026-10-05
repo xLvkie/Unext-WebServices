@@ -256,7 +256,6 @@ public class InstitutionService {
         InstitutionProfile institution = institutionRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new RuntimeException("Perfil de institución no encontrado"));
 
-        // Asumiendo que tu enum de estado tiene el valor PENDING
         List<AcademicValidation> pendingValidations = academicValidationRepository
                 .findByInstitutionProfileIdAndStatus(institution.getId(), ValidationStatus.PENDING);
 
@@ -282,12 +281,10 @@ public class InstitutionService {
         AcademicValidation validation = academicValidationRepository.findById(validationId)
                 .orElseThrow(() -> new RuntimeException("Validación no encontrada"));
 
-        // Seguridad: Verificar que esta validación realmente pertenece a la institución que hace la petición
         if (!validation.getInstitutionProfile().getId().equals(institution.getId())) {
             throw new RuntimeException("No tienes permisos para modificar esta validación.");
         }
 
-        // Actualizar el estado (Convierte el String del request a tu Enum)
         validation.setStatus(ValidationStatus.valueOf(request.getStatus()));
         if (request.getObservations() != null) {
             validation.setObservation(request.getObservations());
@@ -295,12 +292,13 @@ public class InstitutionService {
 
         academicValidationRepository.save(validation);
 
-        // Gatillo: Notificar al estudiante
-        String mensaje = "Tu solicitud de validación académica para la habilidad '" +
+        // Envio de notificación al postulante
+        String notifTitle = "Actualización de Habilidad";
+        String notifContent = "Tu solicitud de validación académica para la habilidad '" +
                 validation.getTechnicalSkill().getName() + "' ha sido " +
-                (request.getStatus().equals("APPROVED") ? "APROBADA" : "RECHAZADA") + ".";
-
-        notificationService.createNotification(validation.getPostulantProfile().getUser(), "Actualización de Habilidad", mensaje);
+                (request.getStatus().equals("APPROVED") ? "APROBADA" : "RECHAZADA") + "." +
+                " " + validation.getObservation();
+        notificationService.createNotification(validation.getPostulantProfile().getUser(), notifTitle, notifContent);
 
         return "El estado de la validación se ha actualizado correctamente.";
     }
