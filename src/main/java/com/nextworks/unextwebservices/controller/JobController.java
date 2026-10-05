@@ -28,6 +28,10 @@ public class JobController {
             @RequestParam(required = false) ExperienceLevel experience) {
 
         return ResponseEntity.ok(jobService.searchJobs(keyword, modality, experience));
+        /*
+        Retorna un listado de todos los trabajos
+        El user requiere uso del token
+         */
     }
 
     @PostMapping("/{jobId}/apply")
@@ -37,11 +41,19 @@ public class JobController {
 
         User user = (User) authentication.getPrincipal();
         return ResponseEntity.ok(jobService.applyToJob(user.getEmail(), jobId));
+        /*
+        Envia su solicitud de aplicación a la vacante mediante el <ID DE LA VACANTE>
+        El user requiere uso del token
+         */
     }
 
     @GetMapping("/applications/me")
     public ResponseEntity<List<ApplicationResponseDTO>> getMyApplications(Authentication authentication) {
         User user = (User) authentication.getPrincipal();
         return ResponseEntity.ok(jobService.getMyApplications(user.getEmail()));
+        /*
+        Retorna un listado de todas las postulaciones de vacantes
+        El user requiere uso del token
+         */
     }
 }

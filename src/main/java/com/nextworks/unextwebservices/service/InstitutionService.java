@@ -21,6 +21,7 @@ public class InstitutionService {
     private final InstitutionEndorsementRepository endorsementRepository;
     private final RecruiterProfileRepository recruiterRepository;
     private final InternshipAgreementRepository agreementRepository;
+    private final AcademicValidationRepository academicValidationRepository;
 
     // Listar alumnos pendientes de validación
     @Transactional(readOnly = true)
@@ -245,5 +246,62 @@ public class InstitutionService {
                         .name(inst.getName())
                         .build())
                 .toList();
+    }
+
+    // Listar validaciones de habilidades pendientes
+    @Transactional(readOnly = true)
+    public List<PendingValidationResponseDTO> getPendingSkillValidations(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        InstitutionProfile institution = institutionRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new RuntimeException("Perfil de institución no encontrado"));
+
+        // Asumiendo que tu enum de estado tiene el valor PENDING
+        List<AcademicValidation> pendingValidations = academicValidationRepository
+                .findByInstitutionProfileIdAndStatus(institution.getId(), ValidationStatus.PENDING);
+
+        return pendingValidations.stream()
+                .map(v -> PendingValidationResponseDTO.builder()
+                        .validationId(v.getId())
+                        .studentName(v.getPostulantProfile().getFirstName() + " " + v.getPostulantProfile().getLastName())
+                        .skillName(v.getTechnicalSkill().getName())
+                        .evidenceUrl(v.getEvidenceUrl())
+                        .status(v.getStatus().name())
+                        .build())
+                .toList();
+    }
+
+    // Aprobar o Rechazar la validación y notificar al alumno
+    @Transactional
+    public String updateSkillValidationStatus(String email, UUID validationId, ValidationUpdateRequestDTO request) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        InstitutionProfile institution = institutionRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new RuntimeException("Perfil de institución no encontrado"));
+
+        AcademicValidation validation = academicValidationRepository.findById(validationId)
+                .orElseThrow(() -> new RuntimeException("Validación no encontrada"));
+
+        // Seguridad: Verificar que esta validación realmente pertenece a la institución que hace la petición
+        if (!validation.getInstitutionProfile().getId().equals(institution.getId())) {
+            throw new RuntimeException("No tienes permisos para modificar esta validación.");
+        }
+
+        // Actualizar el estado (Convierte el String del request a tu Enum)
+        validation.setStatus(ValidationStatus.valueOf(request.getStatus()));
+        if (request.getObservations() != null) {
+            validation.setObservation(request.getObservations());
+        }
+
+        academicValidationRepository.save(validation);
+
+        // Gatillo: Notificar al estudiante
+        String mensaje = "Tu solicitud de validación académica para la habilidad '" +
+                validation.getTechnicalSkill().getName() + "' ha sido " +
+                (request.getStatus().equals("APPROVED") ? "APROBADA" : "RECHAZADA") + ".";
+
+        notificationService.createNotification(validation.getPostulantProfile().getUser(), "Actualización de Habilidad", mensaje);
+
+        return "El estado de la validación se ha actualizado correctamente.";
     }
 }

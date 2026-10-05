@@ -24,6 +24,10 @@ public class InstitutionController {
     public ResponseEntity<List<PendingStudentResponseDTO>> getPendingStudents(Authentication authentication) {
         User user = (User) authentication.getPrincipal();
         return ResponseEntity.ok(institutionService.getPendingStudents(user.getEmail()));
+        /*
+        Retorna todos los estudiantes pendientes de revisión con respecto a la asociación academica
+        El user requiere uso del token
+         */
     }
 
     @PatchMapping("/students/{postulantId}/verify")
@@ -33,6 +37,10 @@ public class InstitutionController {
 
         User user = (User) authentication.getPrincipal();
         return ResponseEntity.ok(institutionService.verifyStudentProfile(user.getEmail(), postulantId));
+        /*
+        Aprueba la asosiación academica, solo acepta el parametro verify
+        El user requiere uso del token
+         */
     }
 
     @PostMapping("/companies/{recruiterId}/endorse")
@@ -85,5 +93,25 @@ public class InstitutionController {
     @GetMapping("/directory")
     public ResponseEntity<List<InstitutionDirectoryResponseDTO>> getAllInstitutions() {
         return ResponseEntity.ok(institutionService.getAllInstitutions());
+        /*
+        Retorna un listado de todas las instituciones
+        El user requiere uso del token
+         */
+    }
+
+    @GetMapping("/validations/pending")
+    public ResponseEntity<List<PendingValidationResponseDTO>> getPendingSkillValidations(Authentication authentication) {
+        User user = (User) authentication.getPrincipal();
+        return ResponseEntity.ok(institutionService.getPendingSkillValidations(user.getEmail()));
+    }
+
+    @PatchMapping("/validations/{validationId}/status")
+    public ResponseEntity<String> updateSkillValidationStatus(
+            Authentication authentication,
+            @PathVariable UUID validationId,
+            @Valid @RequestBody ValidationUpdateRequestDTO request) {
+
+        User user = (User) authentication.getPrincipal();
+        return ResponseEntity.ok(institutionService.updateSkillValidationStatus(user.getEmail(), validationId, request));
     }
 }

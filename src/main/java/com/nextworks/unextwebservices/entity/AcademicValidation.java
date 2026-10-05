@@ -22,16 +22,19 @@ public class AcademicValidation {
     @JoinColumn(name = "postulant_profile_id", nullable = false)
     private PostulantProfile postulantProfile;
 
-    // Relación con la Institución a la que se le pide la validación
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "institution_profile_id", nullable = false)
     private InstitutionProfile institutionProfile;
 
-    @Column(name = "knowledge_title", nullable = false, length = 150)
-    private String knowledgeTitle;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "technical_skill_id", nullable = false)
+    private StudentSkill technicalSkill;
 
     @Column(name = "evidence_url", nullable = false)
     private String evidenceUrl;
+
+    @Column(columnDefinition = "TEXT")
+    private String observation;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)

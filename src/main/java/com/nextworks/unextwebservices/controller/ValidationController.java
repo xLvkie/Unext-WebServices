@@ -31,7 +31,7 @@ public class ValidationController {
         return ResponseEntity.ok(validationService.requestValidation(user.getEmail(), request));
         /*
         Para completar una solicitud de revision de habilidades se requiere completar los campos:
-        institutionProfileId(!), knowledgeTitle(!) y evidenceUrl(!)
+        institutionProfileId(!), technicalSkillId(!) y evidenceUrl(!)
 
         # institutionProfileId no es el userId si no id (PK)
          */
@@ -42,6 +42,7 @@ public class ValidationController {
         User user = (User) authentication.getPrincipal();
         return ResponseEntity.ok(validationService.getMyValidations(user.getEmail()));
         /*
+        Retorna una lista de todas las validacioes
         Se requiere uso del bearer mediante el token del usuario
          */
     }

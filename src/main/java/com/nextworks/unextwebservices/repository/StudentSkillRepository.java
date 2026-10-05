@@ -10,4 +10,5 @@ import java.util.UUID;
 @Repository
 public interface StudentSkillRepository extends JpaRepository<StudentSkill, UUID> {
     List<StudentSkill> findByPostulantProfileId(UUID postulantProfileId);
+    boolean existsByPostulantProfileIdAndNameIgnoreCase(UUID postulantProfileId, String name);
 }

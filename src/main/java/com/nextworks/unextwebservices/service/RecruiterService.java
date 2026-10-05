@@ -3,6 +3,7 @@ package com.nextworks.unextwebservices.service;
 import com.nextworks.unextwebservices.dto.ApplicationResponseDTO;
 import com.nextworks.unextwebservices.dto.JobOfferRequestDTO;
 import com.nextworks.unextwebservices.dto.JobOfferResponseDTO;
+import com.nextworks.unextwebservices.dto.RecruiterDirectoryResponseDTO;
 import com.nextworks.unextwebservices.entity.*;
 import com.nextworks.unextwebservices.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -200,5 +201,16 @@ public class RecruiterService {
         }
 
         return mapToDTO(offer);
+    }
+
+    // Devuelve el listado de empresas
+    @Transactional(readOnly = true)
+    public List<RecruiterDirectoryResponseDTO> getAllRecruiters() {
+        return recruiterRepository.findAll().stream()
+                .map(r -> RecruiterDirectoryResponseDTO.builder()
+                        .id(r.getId())
+                        .companyName(r.getCompanyName())
+                        .build())
+                .toList();
     }
 }

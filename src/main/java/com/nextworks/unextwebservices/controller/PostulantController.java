@@ -23,5 +23,9 @@ public class PostulantController {
 
         User user = (User) authentication.getPrincipal();
         return ResponseEntity.ok(postulantService.linkInstitution(user.getEmail(), institutionId));
+        /*
+        Envia a revisión el estado de su asociación con la institución deseada
+        El user requiere uso del token
+         */
     }
 }

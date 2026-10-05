@@ -9,8 +9,8 @@ import java.util.UUID;
 @Builder
 public class ValidationResponseDTO {
     private UUID id;
-    private String institutionName; // Enviamos el nombre de la U para que el frontend lo muestre bonito
-    private String knowledgeTitle;
+    private String institutionName;
+    private String technicalSkillName;
     private String evidenceUrl;
     private ValidationStatus status;
 }

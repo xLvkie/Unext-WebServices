@@ -3,6 +3,7 @@ package com.nextworks.unextwebservices.dto;
 import lombok.Builder;
 import lombok.Data;
 import java.util.UUID;
+import java.util.List;
 
 @Data
 @Builder
@@ -17,4 +18,5 @@ public class PostulantProfileResponseDTO {
     private String headline;
     private String bio;
     private Boolean hasUniversityBase;
+    private List<StudentSkillResponseDTO> skills;
 }

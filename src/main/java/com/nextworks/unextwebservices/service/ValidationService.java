@@ -2,14 +2,8 @@ package com.nextworks.unextwebservices.service;
 
 import com.nextworks.unextwebservices.dto.ValidationRequestDTO;
 import com.nextworks.unextwebservices.dto.ValidationResponseDTO;
-import com.nextworks.unextwebservices.entity.AcademicValidation;
-import com.nextworks.unextwebservices.entity.InstitutionProfile;
-import com.nextworks.unextwebservices.entity.PostulantProfile;
-import com.nextworks.unextwebservices.entity.User;
-import com.nextworks.unextwebservices.repository.AcademicValidationRepository;
-import com.nextworks.unextwebservices.repository.InstitutionProfileRepository;
-import com.nextworks.unextwebservices.repository.PostulantProfileRepository;
-import com.nextworks.unextwebservices.repository.UserRepository;
+import com.nextworks.unextwebservices.entity.*;
+import com.nextworks.unextwebservices.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +18,7 @@ public class ValidationService {
     private final UserRepository userRepository;
     private final PostulantProfileRepository postulantRepository;
     private final InstitutionProfileRepository institutionRepository;
+    private final StudentSkillRepository studentSkillRepository;
 
     @Transactional
     public ValidationResponseDTO requestValidation(String email, ValidationRequestDTO request) {
@@ -36,12 +31,18 @@ public class ValidationService {
         InstitutionProfile institution = institutionRepository.findById(request.getInstitutionProfileId())
                 .orElseThrow(() -> new RuntimeException("Institución no encontrada"));
 
+        StudentSkill skill = studentSkillRepository.findById(request.getTechnicalSkillId())
+                .orElseThrow(() -> new RuntimeException("Habilidad no encontrada"));
+
+        if (!skill.getPostulantProfile().getId().equals(postulant.getId())) {
+            throw new RuntimeException("No puedes validar una habilidad que no está en tu perfil.");
+        }
+
         AcademicValidation validation = AcademicValidation.builder()
                 .postulantProfile(postulant)
                 .institutionProfile(institution)
-                .knowledgeTitle(request.getKnowledgeTitle())
+                .technicalSkill(skill)
                 .evidenceUrl(request.getEvidenceUrl())
-                // No definimos su estado debido a @PrePersist de la entidad (ya nace con un valor)
                 .build();
 
         validationRepository.save(validation);
@@ -49,7 +50,7 @@ public class ValidationService {
         return ValidationResponseDTO.builder()
                 .id(validation.getId())
                 .institutionName(institution.getName())
-                .knowledgeTitle(validation.getKnowledgeTitle())
+                .technicalSkillName(validation.getTechnicalSkill().getName())
                 .evidenceUrl(validation.getEvidenceUrl())
                 .status(validation.getStatus())
                 .build();
@@ -69,7 +70,7 @@ public class ValidationService {
                 .map(val -> ValidationResponseDTO.builder()
                         .id(val.getId())
                         .institutionName(val.getInstitutionProfile().getName())
-                        .knowledgeTitle(val.getKnowledgeTitle())
+                        .technicalSkillName(val.getTechnicalSkill().getName())
                         .evidenceUrl(val.getEvidenceUrl())
                         .status(val.getStatus())
                         .build())

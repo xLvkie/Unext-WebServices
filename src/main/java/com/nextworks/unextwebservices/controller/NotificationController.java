@@ -22,6 +22,10 @@ public class NotificationController {
     public ResponseEntity<List<NotificationResponseDTO>> getMyNotifications(Authentication authentication) {
         User user = (User) authentication.getPrincipal();
         return ResponseEntity.ok(notificationService.getMyNotifications(user.getEmail()));
+        /*
+        Retorna un listado de todas las notificaciones
+        El user requiere uso del token
+         */
     }
 
     @PatchMapping("/{notificationId}/read")
@@ -31,5 +35,9 @@ public class NotificationController {
 
         User user = (User) authentication.getPrincipal();
         return ResponseEntity.ok(notificationService.markAsRead(user.getEmail(), notificationId));
+        /*
+        Cambia el estado de una notificación de No leido -> Leido
+        El user requiere uso del token
+         */
     }
 }

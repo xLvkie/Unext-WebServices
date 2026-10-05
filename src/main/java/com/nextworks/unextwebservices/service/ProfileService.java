@@ -26,17 +26,14 @@ public class ProfileService {
     // Creación del perfil de los segmentos
     // ==================================== */
     @Transactional
-    public String createPostulantProfile(UUID userId, PostulantProfileRequestDTO request) {
-        // 1. Buscar al usuario
-        User user = userRepository.findById(userId)
+    public String createPostulantProfile(PostulantProfileRequestDTO request, String email) {
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
-        // 2. Validar que no tenga el perfil ya creado
         if (user.getIsProfileCompleted()) {
             throw new RuntimeException("El perfil ya está completado");
         }
 
-        // 3. Crear la entidad del perfil
         PostulantProfile profile = PostulantProfile.builder()
                 .user(user)
                 .firstName(request.getFirstName())
@@ -44,13 +41,11 @@ public class ProfileService {
                 .studentCode(request.getStudentCode())
                 .career(request.getCareer())
                 .currentCycle(request.getCurrentCycle())
-                .hasUniversityBase(true) // Por defecto para esta versión
+                .hasUniversityBase(true)
                 .build();
 
-        // 4. Guardar el perfil en la base de datos
         postulantRepository.save(profile);
 
-        // 5. Actualizar el estado del usuario
         user.setIsProfileCompleted(true);
         userRepository.save(user);
 
@@ -58,8 +53,8 @@ public class ProfileService {
     }
 
     @Transactional
-    public String createRecruiterProfile(UUID userId, RecruiterProfileRequestDTO request) {
-        User user = userRepository.findById(userId)
+    public String createRecruiterProfile(RecruiterProfileRequestDTO request, String email) {
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
         if (user.getIsProfileCompleted()) {
@@ -84,8 +79,8 @@ public class ProfileService {
     }
 
     @Transactional
-    public String createInstitutionProfile(UUID userId, InstitutionProfileRequestDTO request) {
-        User user = userRepository.findById(userId)
+    public String createInstitutionProfile(InstitutionProfileRequestDTO request, String email) {
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
         if (user.getIsProfileCompleted()) {
@@ -117,6 +112,15 @@ public class ProfileService {
         PostulantProfile profile = postulantRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new RuntimeException("Perfil de postulante no encontrado"));
 
+        List<StudentSkill> skills = studentSkillRepository.findByPostulantProfileId(profile.getId());
+        List<StudentSkillResponseDTO> skillsDTO = skills.stream()
+                .map(skill -> StudentSkillResponseDTO.builder()
+                        .id(skill.getId())
+                        .name(skill.getName())
+                        .masteryLevel(skill.getMasteryLevel())
+                        .build())
+                .toList();
+
         return PostulantProfileResponseDTO.builder()
                 .id(profile.getId())
                 .firstName(profile.getFirstName())
@@ -128,6 +132,7 @@ public class ProfileService {
                 .headline(profile.getHeadline())
                 .bio(profile.getBio())
                 .hasUniversityBase(profile.getHasUniversityBase())
+                .skills(skillsDTO)
                 .build();
     }
 
@@ -139,7 +144,6 @@ public class ProfileService {
         PostulantProfile profile = postulantRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new RuntimeException("Perfil de postulante no encontrado"));
 
-        // Actualizamos solo los campos permitidos si vienen en la petición
         if (request.getCareer() != null) profile.setCareer(request.getCareer());
         if (request.getCurrentCycle() != null) profile.setCurrentCycle(request.getCurrentCycle());
         if (request.getCvUrl() != null) profile.setCvUrl(request.getCvUrl());
@@ -232,6 +236,10 @@ public class ProfileService {
 
         PostulantProfile profile = postulantRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new RuntimeException("Perfil de postulante no encontrado"));
+
+        if (studentSkillRepository.existsByPostulantProfileIdAndNameIgnoreCase(profile.getId(), request.getName())) {
+            throw new RuntimeException("Ya tienes una habilidad técnica registrada con el nombre: " + request.getName());
+        }
 
         StudentSkill skill = StudentSkill.builder()
                 .postulantProfile(profile)
