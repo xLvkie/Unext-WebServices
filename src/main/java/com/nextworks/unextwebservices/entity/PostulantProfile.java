@@ -62,4 +62,11 @@ public class PostulantProfile {
 
     @OneToMany(mappedBy = "postulantProfile", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<StudentSkill> skills;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "institution_profile_id")
+    private InstitutionProfile institutionProfile;
+
+    @Column(name = "is_institution_verified")
+    private Boolean isInstitutionVerified;
 }

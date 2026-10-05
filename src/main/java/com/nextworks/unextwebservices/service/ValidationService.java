@@ -41,7 +41,7 @@ public class ValidationService {
                 .institutionProfile(institution)
                 .knowledgeTitle(request.getKnowledgeTitle())
                 .evidenceUrl(request.getEvidenceUrl())
-                // El estado nace en PENDING automáticamente gracias al @PrePersist de tu entidad
+                // No definimos su estado debido a @PrePersist de la entidad (ya nace con un valor)
                 .build();
 
         validationRepository.save(validation);
