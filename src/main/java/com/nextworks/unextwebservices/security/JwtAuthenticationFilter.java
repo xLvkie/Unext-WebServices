@@ -31,30 +31,25 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     @NonNull FilterChain filterChain) throws ServletException, IOException {
 
         final String authHeader = request.getHeader("Authorization");
-
-        // Si no hay cabecera o no empieza con "Bearer ", ignoramos y pasamos al siguiente filtro
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        // Extraemos el token eliminando los primeros 7 caracteres ("Bearer ")
         final String jwt = authHeader.substring(7);
         final String userEmail = jwtUtil.extractUsername(jwt);
 
-        // Si hay un correo y el usuario aún no está autenticado en el contexto actual
         if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             User user = userRepository.findByEmail(userEmail).orElse(null);
 
-            // Validamos que el token pertenezca al usuario y no haya expirado
+            // Validaciónde seguridad (ROLES)
             if (user != null && jwtUtil.isTokenValid(jwt, user.getEmail())) {
                 UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                         user,
                         null,
-                        Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()))
+                        user.getAuthorities()
                 );
                 authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                // Registramos al usuario como autenticado
                 SecurityContextHolder.getContext().setAuthentication(authToken);
             }
         }

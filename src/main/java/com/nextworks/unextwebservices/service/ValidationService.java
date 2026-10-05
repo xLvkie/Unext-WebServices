@@ -19,6 +19,7 @@ public class ValidationService {
     private final PostulantProfileRepository postulantRepository;
     private final InstitutionProfileRepository institutionRepository;
     private final StudentSkillRepository studentSkillRepository;
+    private final NotificationService notificationService;
 
     @Transactional
     public ValidationResponseDTO requestValidation(String email, ValidationRequestDTO request) {
@@ -46,6 +47,13 @@ public class ValidationService {
                 .build();
 
         validationRepository.save(validation);
+
+        // Envio de notificacion
+        User institutionUser = institution.getUser();
+        String notifTitle = "Nueva validación de habilidades recibida";
+        String notifContent = "El postulante " + postulant.getFirstName() + " " + postulant.getLastName() +
+                " ha solicitado la validación de su habilidad: '" + skill.getName() + "'.";
+        notificationService.createNotification(institutionUser, notifTitle, notifContent);
 
         return ValidationResponseDTO.builder()
                 .id(validation.getId())

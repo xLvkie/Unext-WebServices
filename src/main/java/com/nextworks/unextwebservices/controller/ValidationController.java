@@ -7,6 +7,7 @@ import com.nextworks.unextwebservices.service.ValidationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,12 +23,14 @@ public class ValidationController {
 
     private final ValidationService validationService;
 
+    @PreAuthorize("hasAuthority('POSTULANT')")
     @PostMapping("/request")
     public ResponseEntity<ValidationResponseDTO> requestValidation(
             Authentication authentication,
             @Valid @RequestBody ValidationRequestDTO request) {
 
         User user = (User) authentication.getPrincipal();
+        assert user != null;
         return ResponseEntity.ok(validationService.requestValidation(user.getEmail(), request));
         /*
         Para completar una solicitud de revision de habilidades se requiere completar los campos:
@@ -37,9 +40,11 @@ public class ValidationController {
          */
     }
 
+    @PreAuthorize("hasAuthority('POSTULANT')")
     @GetMapping("/me")
     public ResponseEntity<List<ValidationResponseDTO>> getMyValidations(Authentication authentication) {
         User user = (User) authentication.getPrincipal();
+        assert user != null;
         return ResponseEntity.ok(validationService.getMyValidations(user.getEmail()));
         /*
         Retorna una lista de todas las validacioes
