@@ -7,6 +7,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -17,6 +18,7 @@ public class JobOfferResponseDTO {
     private String title;
     private String description;
     private String requirements;
+    private List<String> requiredSkills;
     private String location;
     private JobModality modality;
     private ExperienceLevel experienceLevel;

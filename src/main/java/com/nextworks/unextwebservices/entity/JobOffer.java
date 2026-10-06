@@ -5,6 +5,8 @@ import com.nextworks.unextwebservices.entity.enums.JobModality;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -56,6 +58,10 @@ public class JobOffer {
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
+
+    @OneToMany(mappedBy = "jobOffer", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<JobRequiredSkill> requiredSkills = new ArrayList<>();
 
     @PrePersist
     protected void onCreate() {

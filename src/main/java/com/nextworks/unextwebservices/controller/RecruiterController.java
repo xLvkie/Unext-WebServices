@@ -3,10 +3,10 @@ package com.nextworks.unextwebservices.controller;
 import com.nextworks.unextwebservices.dto.agreement.AgreementCreateRequestDTO;
 import com.nextworks.unextwebservices.dto.agreement.AgreementResponseDTO;
 import com.nextworks.unextwebservices.dto.directory.RecruiterDirectoryResponseDTO;
-import com.nextworks.unextwebservices.dto.job.ApplicationResponseDTO;
 import com.nextworks.unextwebservices.dto.job.JobOfferRequestDTO;
 import com.nextworks.unextwebservices.dto.job.JobOfferResponseDTO;
 import com.nextworks.unextwebservices.dto.job.JobOfferUpdateDTO;
+import com.nextworks.unextwebservices.dto.job.RecruiterApplicationResponseDTO;
 import com.nextworks.unextwebservices.entity.enums.ApplicationStatus;
 import com.nextworks.unextwebservices.entity.User;
 import com.nextworks.unextwebservices.service.RecruiterService;
@@ -49,7 +49,7 @@ public class RecruiterController {
         return ResponseEntity.ok(recruiterService.createJobOffer(user.getEmail(), request));
         /*
         Para completar la creación de la vacante se requieren rellenar los campos: title (!), description (!), requirements (!),
-        location, modality (!), experienceLevel (!), minSalary, maxSalary
+        requiredSkills (! al menos una), location, modality (!), experienceLevel (!), minSalary, maxSalary
         Se quiere que el User use su token
          */
     }
@@ -85,14 +85,19 @@ public class RecruiterController {
 
     @PreAuthorize("hasAuthority('RECRUITER')")
     @GetMapping("/jobs/{jobId}/applications")
-    public ResponseEntity<List<ApplicationResponseDTO>> getApplicationsForJob(
+    public ResponseEntity<List<RecruiterApplicationResponseDTO>> getApplicationsForJob(
             Authentication authentication,
-            @PathVariable UUID jobId) {
+            @PathVariable UUID jobId,
+            @RequestParam(required = false) String career,
+            @RequestParam(required = false) Integer minCycle,
+            @RequestParam(required = false) String skill) {
         User user = (User) authentication.getPrincipal();
         assert user != null;
-        return ResponseEntity.ok(recruiterService.getApplicationsForJob(user.getEmail(), jobId));
+        return ResponseEntity.ok(recruiterService.getApplicationsForJob(
+                user.getEmail(), jobId, career, minCycle, skill));
         /*
-        Retorna un listado de todos las aplicaciones de los postulantes a una vacante de la empresa
+        Retorna las postulaciones de una vacante con resumen académico y porcentaje de afinidad.
+        Filtros opcionales: career, minCycle, skill. Sin filtros, lista cronológica completa.
         Se quiere que el User use su token
          */
     }

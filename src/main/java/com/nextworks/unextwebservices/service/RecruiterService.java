@@ -3,10 +3,10 @@ package com.nextworks.unextwebservices.service;
 import com.nextworks.unextwebservices.dto.agreement.AgreementCreateRequestDTO;
 import com.nextworks.unextwebservices.dto.agreement.AgreementResponseDTO;
 import com.nextworks.unextwebservices.dto.directory.RecruiterDirectoryResponseDTO;
-import com.nextworks.unextwebservices.dto.job.ApplicationResponseDTO;
 import com.nextworks.unextwebservices.dto.job.JobOfferRequestDTO;
 import com.nextworks.unextwebservices.dto.job.JobOfferResponseDTO;
 import com.nextworks.unextwebservices.dto.job.JobOfferUpdateDTO;
+import com.nextworks.unextwebservices.dto.job.RecruiterApplicationResponseDTO;
 import com.nextworks.unextwebservices.entity.*;
 import com.nextworks.unextwebservices.entity.enums.AgreementStatus;
 import com.nextworks.unextwebservices.entity.enums.ApplicationStatus;
@@ -30,6 +30,7 @@ public class RecruiterService {
     private final InstitutionProfileRepository institutionRepository;
     private final InternshipAgreementRepository internshipAgreementRepository;
     private final NotificationService notificationService;
+    private final MatchingService matchingService;
 
     /* ====================================
     // Creación de nueva vacante
@@ -56,8 +57,11 @@ public class RecruiterService {
                 .build();
 
         jobOfferRepository.save(offer);
+        matchingService.replaceRequiredSkills(offer, request.getRequiredSkills());
+        jobOfferRepository.save(offer);
+        matchingService.notifyCompatiblePostulants(offer);
 
-        return mapToDTO(offer);
+        return matchingService.toOfferDto(offer);
     }
 
     /* ====================================
@@ -112,19 +116,7 @@ public class RecruiterService {
     }
 
     private JobOfferResponseDTO mapToDTO(JobOffer offer) {
-        return JobOfferResponseDTO.builder()
-                .id(offer.getId())
-                .companyName(offer.getRecruiterProfile().getCompanyName())
-                .title(offer.getTitle())
-                .description(offer.getDescription())
-                .requirements(offer.getRequirements())
-                .location(offer.getLocation())
-                .modality(offer.getModality())
-                .experienceLevel(offer.getExperienceLevel())
-                .minSalary(offer.getMinSalary())
-                .maxSalary(offer.getMaxSalary())
-                .createdAt(offer.getCreatedAt())
-                .build();
+        return matchingService.toOfferDto(offer);
     }
 
     /* ============================================
@@ -142,7 +134,12 @@ public class RecruiterService {
     }
 
     @Transactional(readOnly = true)
-    public List<ApplicationResponseDTO> getApplicationsForJob(String email, UUID jobId) {
+    public List<RecruiterApplicationResponseDTO> getApplicationsForJob(
+            String email,
+            UUID jobId,
+            String career,
+            Integer minCycle,
+            String skill) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
         RecruiterProfile profile = recruiterRepository.findByUserId(user.getId())
@@ -154,15 +151,70 @@ public class RecruiterService {
             throw new RuntimeException("No tienes permiso para ver esta vacante");
         }
 
-        return applicationRepository.findByJobOfferIdOrderByCreatedAtDesc(jobId)
-                .stream().map(app -> ApplicationResponseDTO.builder()
-                        .id(app.getId())
-                        .jobTitle(offer.getTitle())
-                        .companyName(profile.getCompanyName())
-                        .status(app.getStatus())
-                        .appliedAt(app.getCreatedAt())
-                        .build())
+        List<String> requiredSkills = matchingService.requiredSkillNames(offer);
+        String careerFilter = career == null ? null : career.trim();
+        String skillFilter = skill == null ? null : skill.trim();
+        boolean hasFilters = (careerFilter != null && !careerFilter.isEmpty())
+                || minCycle != null
+                || (skillFilter != null && !skillFilter.isEmpty());
+
+        List<RecruiterApplicationResponseDTO> results = applicationRepository
+                .findByJobOfferIdOrderByCreatedAtDesc(jobId)
+                .stream()
+                .map(app -> {
+                    PostulantProfile postulant = app.getPostulantProfile();
+                    List<String> skills = matchingService.studentSkillNames(postulant);
+                    MatchingService.MatchResult match = matchingService.evaluate(skills, requiredSkills);
+                    return RecruiterApplicationResponseDTO.builder()
+                            .id(app.getId())
+                            .postulantProfileId(postulant.getId())
+                            .firstName(postulant.getFirstName())
+                            .lastName(postulant.getLastName())
+                            .career(postulant.getCareer())
+                            .currentCycle(postulant.getCurrentCycle())
+                            .headline(postulant.getHeadline())
+                            .isInstitutionVerified(postulant.getIsInstitutionVerified())
+                            .skills(skills)
+                            .status(app.getStatus())
+                            .appliedAt(app.getCreatedAt())
+                            .compatibilityPercent(match.percent())
+                            .compatibilityLabel(match.label())
+                            .matchingHint(match.hint())
+                            .build();
+                })
+                .filter(dto -> matchesFilters(dto, careerFilter, minCycle, skillFilter))
                 .toList();
+
+        if (hasFilters && results.isEmpty()) {
+            throw new RuntimeException(MatchingService.NO_CANDIDATES_MESSAGE);
+        }
+        return results;
+    }
+
+    private boolean matchesFilters(
+            RecruiterApplicationResponseDTO dto,
+            String career,
+            Integer minCycle,
+            String skill) {
+        if (career != null && !career.isEmpty()) {
+            if (dto.getCareer() == null
+                    || !dto.getCareer().toLowerCase().contains(career.toLowerCase())) {
+                return false;
+            }
+        }
+        if (minCycle != null) {
+            if (dto.getCurrentCycle() == null || dto.getCurrentCycle() < minCycle) {
+                return false;
+            }
+        }
+        if (skill != null && !skill.isEmpty()) {
+            boolean hasSkill = dto.getSkills() != null && dto.getSkills().stream()
+                    .anyMatch(name -> name.equalsIgnoreCase(skill));
+            if (!hasSkill) {
+                return false;
+            }
+        }
+        return true;
     }
 
     @Transactional
@@ -201,6 +253,9 @@ public class RecruiterService {
         }
         if (request.getMaxSalary() != null) {
             offer.setMaxSalary(request.getMaxSalary());
+        }
+        if (request.getRequiredSkills() != null) {
+            matchingService.replaceRequiredSkills(offer, request.getRequiredSkills());
         }
 
         jobOfferRepository.save(offer);

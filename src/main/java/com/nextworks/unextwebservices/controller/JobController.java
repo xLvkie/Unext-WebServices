@@ -2,6 +2,7 @@ package com.nextworks.unextwebservices.controller;
 
 import com.nextworks.unextwebservices.dto.job.ApplicationResponseDTO;
 import com.nextworks.unextwebservices.dto.job.JobOfferResponseDTO;
+import com.nextworks.unextwebservices.dto.job.JobRecommendationResponseDTO;
 import com.nextworks.unextwebservices.entity.enums.ExperienceLevel;
 import com.nextworks.unextwebservices.entity.enums.JobModality;
 import com.nextworks.unextwebservices.entity.User;
@@ -33,6 +34,39 @@ public class JobController {
         /*
         Retorna un listado de todos los trabajos
         El user requiere uso del token
+         */
+    }
+
+    @PreAuthorize("hasAnyAuthority('POSTULANT', 'RECRUITER')")
+    @GetMapping("/skills/suggestions")
+    public ResponseEntity<List<String>> suggestSkills(@RequestParam(required = false) String q) {
+        return ResponseEntity.ok(jobService.suggestSkills(q));
+        /*
+        Autocompletado de habilidades a partir de skills ya registradas
+         */
+    }
+
+    @PreAuthorize("hasAuthority('POSTULANT')")
+    @GetMapping("/recommendations")
+    public ResponseEntity<List<JobRecommendationResponseDTO>> getRecommendations(Authentication authentication) {
+        User user = (User) authentication.getPrincipal();
+        assert user != null;
+        return ResponseEntity.ok(jobService.getRecommendations(user.getEmail()));
+        /*
+        Vacantes con afinidad >= 80%. Requiere habilidades técnicas en el perfil.
+         */
+    }
+
+    @PreAuthorize("hasAuthority('POSTULANT')")
+    @PostMapping("/{jobId}/not-interested")
+    public ResponseEntity<String> dismissRecommendation(
+            Authentication authentication,
+            @PathVariable UUID jobId) {
+        User user = (User) authentication.getPrincipal();
+        assert user != null;
+        return ResponseEntity.ok(jobService.dismissRecommendation(user.getEmail(), jobId));
+        /*
+        Descarta una vacante recomendada para no volver a mostrarla
          */
     }
 

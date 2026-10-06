@@ -2,6 +2,7 @@ package com.nextworks.unextwebservices.service;
 
 import com.nextworks.unextwebservices.dto.job.ApplicationResponseDTO;
 import com.nextworks.unextwebservices.dto.job.JobOfferResponseDTO;
+import com.nextworks.unextwebservices.dto.job.JobRecommendationResponseDTO;
 import com.nextworks.unextwebservices.entity.*;
 import com.nextworks.unextwebservices.entity.enums.ExperienceLevel;
 import com.nextworks.unextwebservices.entity.enums.JobModality;
@@ -25,6 +26,7 @@ public class JobService {
     private final UserRepository userRepository;
     private final PostulantProfileRepository postulantRepository;
     private final NotificationService notificationService;
+    private final MatchingService matchingService;
 
     /* ============================================
     // Buscar, aplicar y obtener mis postulaciones
@@ -35,19 +37,7 @@ public class JobService {
         List<JobOffer> offers = jobOfferRepository.searchActiveOffers(searchKeyword, modality, experience);
 
         return offers.stream()
-                .map(offer -> JobOfferResponseDTO.builder()
-                        .id(offer.getId())
-                        .companyName(offer.getRecruiterProfile().getCompanyName())
-                        .title(offer.getTitle())
-                        .description(offer.getDescription())
-                        .requirements(offer.getRequirements())
-                        .location(offer.getLocation())
-                        .modality(offer.getModality())
-                        .experienceLevel(offer.getExperienceLevel())
-                        .minSalary(offer.getMinSalary())
-                        .maxSalary(offer.getMaxSalary())
-                        .createdAt(offer.getCreatedAt())
-                        .build())
+                .map(matchingService::toOfferDto)
                 .toList();
     }
 
@@ -110,5 +100,20 @@ public class JobService {
                         .appliedAt(application.getCreatedAt())
                         .build())
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<String> suggestSkills(String query) {
+        return matchingService.suggestSkills(query);
+    }
+
+    @Transactional(readOnly = true)
+    public List<JobRecommendationResponseDTO> getRecommendations(String email) {
+        return matchingService.getRecommendations(email);
+    }
+
+    @Transactional
+    public String dismissRecommendation(String email, UUID jobId) {
+        return matchingService.dismissRecommendation(email, jobId);
     }
 }
