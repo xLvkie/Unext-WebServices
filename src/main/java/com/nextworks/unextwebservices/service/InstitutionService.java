@@ -10,19 +10,26 @@ import com.nextworks.unextwebservices.dto.validation.PendingValidationResponseDT
 import com.nextworks.unextwebservices.dto.validation.ValidationUpdateDTO;
 import com.nextworks.unextwebservices.entity.*;
 import com.nextworks.unextwebservices.entity.enums.AgreementStatus;
+import com.nextworks.unextwebservices.entity.enums.ApplicationStatus;
 import com.nextworks.unextwebservices.entity.enums.ValidationStatus;
 import com.nextworks.unextwebservices.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataAccessException;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class InstitutionService {
+
+    // Numero minimo de instituciones que deben acreditar activamente a una empresa para que obtenga la insignia
+    private static final int ACCREDITATION_THRESHOLD = 1;
 
     private final InstitutionProfileRepository institutionRepository;
     private final PostulantProfileRepository postulantRepository;
@@ -107,7 +114,7 @@ public class InstitutionService {
         return responseMessage;
     }
 
-    // Otorgar Insignia a una Empresa
+    // Otorgar Insignia a una Empresa: solo si la institucion tiene al menos un convenio APPROVED con ella
     @Transactional
     public String endorseCompany(String email, UUID recruiterId) {
         User user = userRepository.findByEmail(email)
@@ -116,18 +123,34 @@ public class InstitutionService {
                 .orElseThrow(() -> new RuntimeException("Perfil de institución no encontrado"));
 
         RecruiterProfile recruiter = recruiterRepository.findById(recruiterId)
-                .orElseThrow(() -> new RuntimeException("Empresa no encontrada"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Empresa no encontrada"));
 
-        if (endorsementRepository.existsByInstitutionProfileIdAndRecruiterProfileId(institution.getId(), recruiterId)) {
-            throw new RuntimeException("Esta empresa ya cuenta con tu insignia de confianza.");
+        if (!agreementRepository.existsByInstitutionProfileIdAndRecruiterProfileIdAndStatus(
+                institution.getId(), recruiterId, AgreementStatus.APPROVED)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Solo puedes acreditar empresas con convenios aprobados");
         }
 
-        InstitutionEndorsement endorsement = InstitutionEndorsement.builder()
-                .institutionProfile(institution)
-                .recruiterProfile(recruiter)
-                .build();
+        InstitutionEndorsement endorsement = endorsementRepository
+                .findByInstitutionProfileIdAndRecruiterProfileId(institution.getId(), recruiterId)
+                .orElse(null);
+
+        if (endorsement != null && endorsement.getRevokedAt() == null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Esta empresa ya cuenta con tu insignia de confianza.");
+        }
+
+        if (endorsement != null) {
+            // Ya existia (estaba revocada): se reactiva en vez de crear una fila nueva
+            endorsement.setRevokedAt(null);
+            endorsement.setRevocationReason(null);
+        } else {
+            endorsement = InstitutionEndorsement.builder()
+                    .institutionProfile(institution)
+                    .recruiterProfile(recruiter)
+                    .build();
+        }
 
         endorsementRepository.save(endorsement);
+        recalculateAccreditation(recruiter);
 
         String notifTitle = "¡Insignia de Empresa Aliada!";
         String notifContent = "Una institución educativa te ha otorgado su sello de confianza. Tus vacantes ahora destacarán para sus alumnos.";
@@ -136,9 +159,17 @@ public class InstitutionService {
         return "Insignia otorgada exitosamente a " + recruiter.getCompanyName();
     }
 
-    // Retirar Insignia a una Empresa
+    // Recalcula validationsCount (instituciones que acreditan activamente) e isValidated (umbral) de la empresa
+    private void recalculateAccreditation(RecruiterProfile recruiter) {
+        long activeCount = endorsementRepository.countByRecruiterProfileIdAndRevokedAtIsNull(recruiter.getId());
+        recruiter.setValidationsCount((int) activeCount);
+        recruiter.setIsValidated(activeCount >= ACCREDITATION_THRESHOLD);
+        recruiterRepository.save(recruiter);
+    }
+
+    // Retirar Insignia a una Empresa (exige motivo, no borra la fila)
     @Transactional
-    public String removeEndorsement(String email, UUID recruiterId) {
+    public String removeEndorsement(String email, UUID recruiterId, String reason) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
         InstitutionProfile institution = institutionRepository.findByUserId(user.getId())
@@ -146,13 +177,24 @@ public class InstitutionService {
 
         InstitutionEndorsement endorsement = endorsementRepository
                 .findByInstitutionProfileIdAndRecruiterProfileId(institution.getId(), recruiterId)
-                .orElseThrow(() -> new RuntimeException("La empresa no cuenta con tu insignia."));
+                .filter(e -> e.getRevokedAt() == null)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "La empresa no cuenta con tu insignia."));
 
-        endorsementRepository.delete(endorsement);
+        endorsement.setRevokedAt(LocalDateTime.now());
+        endorsement.setRevocationReason(reason);
+        endorsementRepository.save(endorsement);
+
+        RecruiterProfile recruiter = endorsement.getRecruiterProfile();
+        recalculateAccreditation(recruiter);
+
+        String notifTitle = "Insignia de Empresa Aliada retirada";
+        String notifContent = "Una institución educativa ha retirado su sello de confianza de tu perfil.";
+        notificationService.createNotification(recruiter.getUser(), notifTitle, notifContent);
+
         return "Insignia retirada exitosamente.";
     }
 
-    // Listar Empresas Aliadas
+    // Listar Empresas Aliadas (solo acreditaciones activas)
     @Transactional(readOnly = true)
     public List<EndorsedCompanyResponseDTO> getEndorsedCompanies(String email) {
         User user = userRepository.findByEmail(email)
@@ -160,7 +202,7 @@ public class InstitutionService {
         InstitutionProfile institution = institutionRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new RuntimeException("Perfil de institución no encontrado"));
 
-        return endorsementRepository.findByInstitutionProfileId(institution.getId())
+        return endorsementRepository.findByInstitutionProfileIdAndRevokedAtIsNull(institution.getId())
                 .stream()
                 .map(e -> EndorsedCompanyResponseDTO.builder()
                         .recruiterId(e.getRecruiterProfile().getId())
@@ -185,21 +227,7 @@ public class InstitutionService {
             agreements = agreementRepository.findByInstitutionProfileIdOrderByCreatedAtDesc(institution.getId());
         }
 
-        return agreements.stream()
-                .map(a -> AgreementResponseDTO.builder()
-                        .id(a.getId())
-                        .title(a.getTitle())
-                        .companyName(a.getRecruiterProfile().getCompanyName())
-                        .studentName(a.getPostulantProfile().getFirstName() + " " + a.getPostulantProfile().getLastName())
-                        .startDate(a.getStartDate())
-                        .endDate(a.getEndDate())
-                        .weeklyHours(a.getWeeklyHours())
-                        .documentUrl(a.getDocumentUrl())
-                        .status(a.getStatus())
-                        .observations(a.getObservations())
-                        .createdAt(a.getCreatedAt())
-                        .build())
-                .toList();
+        return agreements.stream().map(this::mapAgreementToDTO).toList();
     }
 
     // Actualizar Estado del Convenio
@@ -210,35 +238,31 @@ public class InstitutionService {
         InstitutionProfile institution = institutionRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new RuntimeException("Perfil de institución no encontrado"));
 
-        InternshipAgreement agreement = agreementRepository.findById(agreementId)
-                .orElseThrow(() -> new RuntimeException("Convenio no encontrado"));
+        // Si el convenio es de otra institución, no se revela que existe (404)
+        InternshipAgreement agreement = agreementRepository.findByIdAndInstitutionProfileId(agreementId, institution.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Convenio no encontrado"));
 
-        if (!agreement.getInstitutionProfile().getId().equals(institution.getId())) {
-            throw new RuntimeException("HTTP 403: No tienes permiso para modificar este convenio.");
+        if (agreement.getStatus() != AgreementStatus.PENDING) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "El convenio ya fue revisado");
         }
 
         if (request.getStatus() != AgreementStatus.APPROVED && request.getStatus() != AgreementStatus.REJECTED) {
-            throw new RuntimeException("HTTP 400: El estado de la evaluación solo puede ser APPROVED o REJECTED.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El estado de la evaluación solo puede ser APPROVED o REJECTED.");
         }
-        if (request.getStatus() == AgreementStatus.REJECTED
-                && (request.getObservations() == null || request.getObservations().isBlank())) {
-            throw new RuntimeException("Debe ingresar un motivo para el rechazo");
+
+        if (request.getStatus() == AgreementStatus.REJECTED &&
+                (request.getObservations() == null || request.getObservations().isBlank())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Debe ingresar un motivo para el rechazo");
         }
 
         User postulantUser = agreement.getPostulantProfile().getUser();
         User recruiterUser = agreement.getRecruiterProfile().getUser();
-        String action;
+        String action = request.getStatus() == AgreementStatus.APPROVED ? "APROBADO" : "RECHAZADO";
 
-        if (request.getStatus() == AgreementStatus.APPROVED) {
-            agreement.setStatus(AgreementStatus.APPROVED);
-            if (request.getObservations() != null) {
-                agreement.setObservations(request.getObservations());
-            }
-            action = "APROBADO";
-        } else {
-            agreement.setStatus(AgreementStatus.REJECTED);
+        agreement.setStatus(request.getStatus());
+        agreement.setReviewedAt(LocalDateTime.now());
+        if (request.getObservations() != null && !request.getObservations().isBlank()) {
             agreement.setObservations(request.getObservations().trim());
-            action = "RECHAZADO";
         }
         agreementRepository.save(agreement);
 
@@ -251,18 +275,24 @@ public class InstitutionService {
         notificationService.createNotification(postulantUser, notifTitle, notifContent);
         notificationService.createNotification(recruiterUser, notifTitle, notifContent);
 
+        return mapAgreementToDTO(agreement);
+    }
+
+    private AgreementResponseDTO mapAgreementToDTO(InternshipAgreement a) {
         return AgreementResponseDTO.builder()
-                .id(agreement.getId())
-                .title(agreement.getTitle())
-                .companyName(agreement.getRecruiterProfile().getCompanyName())
-                .studentName(agreement.getPostulantProfile().getFirstName() + " " + agreement.getPostulantProfile().getLastName())
-                .startDate(agreement.getStartDate())
-                .endDate(agreement.getEndDate())
-                .weeklyHours(agreement.getWeeklyHours())
-                .documentUrl(agreement.getDocumentUrl())
-                .status(agreement.getStatus())
-                .observations(agreement.getObservations())
-                .createdAt(agreement.getCreatedAt())
+                .id(a.getId())
+                .jobApplicationId(a.getJobApplication() != null ? a.getJobApplication().getId() : null)
+                .title(a.getTitle())
+                .companyName(a.getRecruiterProfile().getCompanyName())
+                .studentName(a.getPostulantProfile().getFirstName() + " " + a.getPostulantProfile().getLastName())
+                .startDate(a.getStartDate())
+                .endDate(a.getEndDate())
+                .weeklyHours(a.getWeeklyHours())
+                .documentUrl(a.getDocumentUrl())
+                .status(a.getStatus())
+                .observations(a.getObservations())
+                .reviewedAt(a.getReviewedAt())
+                .createdAt(a.getCreatedAt())
                 .build();
     }
 
@@ -279,23 +309,19 @@ public class InstitutionService {
                     .orElseThrow(() -> new RuntimeException("Perfil de institución no encontrado"));
 
             UUID instId = institution.getId();
-            String careerFilter = career == null ? null : career.trim();
-            boolean filterByCareer = careerFilter != null && !careerFilter.isEmpty();
+            String careerFilter = career == null ? "" : career.trim().toLowerCase();
 
-            if (filterByCareer && postulantRepository.countByInstitutionProfileIdAndCareerIgnoreCase(instId, careerFilter) == 0) {
+            if (!careerFilter.isEmpty()
+                    && postulantRepository.countStudentsByInstitutionAndCareer(instId, careerFilter) == 0) {
                 throw new RuntimeException(DASHBOARD_EMPTY);
             }
 
-            long verifiedStudents = filterByCareer
-                    ? postulantRepository.countByInstitutionProfileIdAndIsInstitutionVerifiedTrueAndCareerIgnoreCase(instId, careerFilter)
-                    : postulantRepository.countByInstitutionProfileIdAndIsInstitutionVerifiedTrue(instId);
-            long hiredStudents = filterByCareer
-                    ? postulantRepository.countHiredStudentsByInstitutionIdAndCareer(instId, careerFilter)
-                    : postulantRepository.countHiredStudentsByInstitutionId(instId);
-            long activeAgreements = filterByCareer
-                    ? agreementRepository.countByInstitutionAndStatusAndCareer(instId, AgreementStatus.APPROVED, careerFilter)
-                    : agreementRepository.countByInstitutionProfileIdAndStatus(instId, AgreementStatus.APPROVED);
-            long endorsedCompanies = endorsementRepository.countByInstitutionProfileId(instId);
+            long verifiedStudents = postulantRepository.countVerifiedByInstitutionAndCareer(instId, careerFilter);
+            long hiredStudents = postulantRepository.countHiredByInstitutionAndCareer(
+                    instId, careerFilter, ApplicationStatus.ACCEPTED);
+            long activeAgreements = agreementRepository.countByInstitutionAndStatusAndCareer(
+                    instId, AgreementStatus.APPROVED, careerFilter);
+            long endorsedCompanies = endorsementRepository.countByInstitutionProfileIdAndRevokedAtIsNull(instId);
             double rate = verifiedStudents > 0 ? ((double) hiredStudents / verifiedStudents) * 100 : 0.0;
 
             return DashboardStatsResponseDTO.builder()
@@ -304,7 +330,7 @@ public class InstitutionService {
                     .totalActiveAgreements(activeAgreements)
                     .totalEndorsedCompanies(endorsedCompanies)
                     .employabilityRate(Math.round(rate * 100.0) / 100.0)
-                    .career(filterByCareer ? careerFilter : null)
+                    .career(careerFilter.isEmpty() ? null : career.trim())
                     .build();
         } catch (DataAccessException ex) {
             throw new RuntimeException(DASHBOARD_DB_ERROR);

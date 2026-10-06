@@ -10,10 +10,13 @@ import com.nextworks.unextwebservices.dto.job.RecruiterApplicationResponseDTO;
 import com.nextworks.unextwebservices.entity.*;
 import com.nextworks.unextwebservices.entity.enums.AgreementStatus;
 import com.nextworks.unextwebservices.entity.enums.ApplicationStatus;
+import com.nextworks.unextwebservices.entity.enums.ExperienceLevel;
 import com.nextworks.unextwebservices.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.UUID;
@@ -352,12 +355,36 @@ public class RecruiterService {
             throw new RuntimeException("HTTP 400: No se puede crear un convenio institucional porque el estudiante no está verificado por ninguna universidad.");
         }
 
+        // Si se indica la postulación, se valida que sea TRAINEE y se liga el convenio a ella
+        JobApplication jobApplication = null;
+        if (request.getJobApplicationId() != null) {
+            jobApplication = applicationRepository.findById(request.getJobApplicationId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Postulación no encontrada"));
+
+            if (!jobApplication.getJobOffer().getRecruiterProfile().getId().equals(recruiter.getId())) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Postulación no encontrada");
+            }
+
+            if (!jobApplication.getPostulantProfile().getId().equals(postulant.getId())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La postulación indicada no corresponde al alumno indicado");
+            }
+
+            if (jobApplication.getJobOffer().getExperienceLevel() != ExperienceLevel.TRAINEE) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Solo se pueden generar convenios de prácticas para vacantes de nivel TRAINEE");
+            }
+
+            if (internshipAgreementRepository.existsByJobApplicationId(jobApplication.getId())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Ya existe un convenio registrado para esta postulación");
+            }
+        }
+
         InstitutionProfile institution = postulant.getInstitutionProfile();
         InternshipAgreement agreement = InternshipAgreement.builder()
                 .title(request.getTitle())
                 .recruiterProfile(recruiter)
                 .postulantProfile(postulant)
                 .institutionProfile(institution)
+                .jobApplication(jobApplication)
                 .startDate(request.getStartDate())
                 .endDate(request.getEndDate())
                 .weeklyHours(request.getWeeklyHours())
@@ -376,6 +403,7 @@ public class RecruiterService {
 
         return AgreementResponseDTO.builder()
                 .id(agreement.getId())
+                .jobApplicationId(agreement.getJobApplication() != null ? agreement.getJobApplication().getId() : null)
                 .title(agreement.getTitle())
                 .companyName(recruiter.getCompanyName())
                 .studentName(postulant.getFirstName() + " " + postulant.getLastName())

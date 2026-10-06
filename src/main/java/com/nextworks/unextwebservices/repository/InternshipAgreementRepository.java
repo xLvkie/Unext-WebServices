@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -18,6 +19,12 @@ public interface InternshipAgreementRepository extends JpaRepository<InternshipA
     List<InternshipAgreement> findByInstitutionProfileIdAndStatusOrderByCreatedAtDesc(UUID institutionId, AgreementStatus status);
     long countByInstitutionProfileIdAndStatus(UUID institutionId, AgreementStatus status);
 
-    @Query("SELECT COUNT(a) FROM InternshipAgreement a WHERE a.institutionProfile.id = :institutionId AND a.status = :status AND LOWER(a.postulantProfile.career) = LOWER(:career)")
-    long countByInstitutionAndStatusAndCareer(@Param("institutionId") UUID institutionId, @Param("status") AgreementStatus status, @Param("career") String career);
+    @Query("SELECT COUNT(a) FROM InternshipAgreement a WHERE a.institutionProfile.id = :institutionId " +
+            "AND a.status = :status AND (:career = '' OR LOWER(TRIM(a.postulantProfile.career)) = :career)")
+    long countByInstitutionAndStatusAndCareer(@Param("institutionId") UUID institutionId,
+                                              @Param("status") AgreementStatus status, @Param("career") String career);
+
+    boolean existsByInstitutionProfileIdAndRecruiterProfileIdAndStatus(UUID institutionProfileId, UUID recruiterProfileId, AgreementStatus status);
+    Optional<InternshipAgreement> findByIdAndInstitutionProfileId(UUID id, UUID institutionProfileId);
+    boolean existsByJobApplicationId(UUID jobApplicationId);
 }
