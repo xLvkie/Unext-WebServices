@@ -7,6 +7,7 @@ import com.nextworks.unextwebservices.dto.directory.InstitutionDirectoryResponse
 import com.nextworks.unextwebservices.dto.validation.EndorsedCompanyResponseDTO;
 import com.nextworks.unextwebservices.dto.validation.PendingStudentResponseDTO;
 import com.nextworks.unextwebservices.dto.validation.PendingValidationResponseDTO;
+import com.nextworks.unextwebservices.dto.validation.RevokeEndorsementRequestDTO;
 import com.nextworks.unextwebservices.dto.validation.ValidationUpdateDTO;
 import com.nextworks.unextwebservices.entity.enums.AgreementStatus;
 import com.nextworks.unextwebservices.entity.User;
@@ -75,12 +76,16 @@ public class InstitutionController {
     @DeleteMapping("/companies/{recruiterId}/endorse")
     public ResponseEntity<String> removeEndorsement(
             Authentication authentication,
-            @PathVariable UUID recruiterId) {
+            @PathVariable UUID recruiterId,
+            @Valid @RequestBody RevokeEndorsementRequestDTO request) {
         User user = (User) authentication.getPrincipal();
         assert user != null;
-        return ResponseEntity.ok(institutionService.removeEndorsement(user.getEmail(), recruiterId));
+        return ResponseEntity.ok(institutionService.removeEndorsement(user.getEmail(), recruiterId, request.getReason()));
         /*
-        Elimina una insignia de verificación a la empresa, es necesario el <ID DE LA EMPRESA>
+        Retira la insignia de confianza a la empresa, requiere body {"reason": "..."}.
+        Nota: algunos clientes HTTP (y algunos navegadores/fetch por defecto) descartan el body en
+        peticiones DELETE. Si el frontend no logra enviarlo, habria que mover el motivo a un
+        @RequestParam o cambiar el verbo a PATCH.
          */
     }
 

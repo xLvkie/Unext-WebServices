@@ -32,6 +32,11 @@ public class InternshipAgreement {
     @JoinColumn(name = "postulant_profile_id", nullable = false)
     private PostulantProfile postulantProfile;
 
+    // Vinculo opcional a la postulacion que originó el convenio (permite validar TRAINEE y evitar duplicados)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "job_application_id", unique = true)
+    private JobApplication jobApplication;
+
     @Column(nullable = false, length = 200)
     private String title;
 
@@ -53,6 +58,9 @@ public class InternshipAgreement {
 
     @Column(columnDefinition = "TEXT")
     private String observations;
+
+    @Column(name = "reviewed_at")
+    private LocalDateTime reviewedAt;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
