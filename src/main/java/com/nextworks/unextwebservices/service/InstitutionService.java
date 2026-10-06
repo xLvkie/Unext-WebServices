@@ -13,15 +13,21 @@ import com.nextworks.unextwebservices.entity.enums.AgreementStatus;
 import com.nextworks.unextwebservices.entity.enums.ValidationStatus;
 import com.nextworks.unextwebservices.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class InstitutionService {
+
+    // Numero minimo de instituciones que deben acreditar activamente a una empresa para que obtenga la insignia
+    private static final int ACCREDITATION_THRESHOLD = 1;
 
     private final InstitutionProfileRepository institutionRepository;
     private final PostulantProfileRepository postulantRepository;
@@ -106,7 +112,7 @@ public class InstitutionService {
         return responseMessage;
     }
 
-    // Otorgar Insignia a una Empresa
+    // Otorgar Insignia a una Empresa: solo si la institucion tiene al menos un convenio APPROVED con ella
     @Transactional
     public String endorseCompany(String email, UUID recruiterId) {
         User user = userRepository.findByEmail(email)
@@ -115,24 +121,48 @@ public class InstitutionService {
                 .orElseThrow(() -> new RuntimeException("Perfil de institución no encontrado"));
 
         RecruiterProfile recruiter = recruiterRepository.findById(recruiterId)
-                .orElseThrow(() -> new RuntimeException("Empresa no encontrada"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Empresa no encontrada"));
 
-        if (endorsementRepository.existsByInstitutionProfileIdAndRecruiterProfileId(institution.getId(), recruiterId)) {
-            throw new RuntimeException("Esta empresa ya cuenta con tu insignia de confianza.");
+        if (!agreementRepository.existsByInstitutionProfileIdAndRecruiterProfileIdAndStatus(
+                institution.getId(), recruiterId, AgreementStatus.APPROVED)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Solo puedes acreditar empresas con convenios aprobados");
         }
 
-        InstitutionEndorsement endorsement = InstitutionEndorsement.builder()
-                .institutionProfile(institution)
-                .recruiterProfile(recruiter)
-                .build();
+        InstitutionEndorsement endorsement = endorsementRepository
+                .findByInstitutionProfileIdAndRecruiterProfileId(institution.getId(), recruiterId)
+                .orElse(null);
+
+        if (endorsement != null && endorsement.getRevokedAt() == null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Esta empresa ya cuenta con tu insignia de confianza.");
+        }
+
+        if (endorsement != null) {
+            // Ya existia (estaba revocada): se reactiva en vez de crear una fila nueva
+            endorsement.setRevokedAt(null);
+            endorsement.setRevocationReason(null);
+        } else {
+            endorsement = InstitutionEndorsement.builder()
+                    .institutionProfile(institution)
+                    .recruiterProfile(recruiter)
+                    .build();
+        }
 
         endorsementRepository.save(endorsement);
+        recalculateAccreditation(recruiter);
 
         String notifTitle = "¡Insignia de Empresa Aliada!";
         String notifContent = "Una institución educativa te ha otorgado su sello de confianza. Tus vacantes ahora destacarán para sus alumnos.";
         notificationService.createNotification(recruiter.getUser(), notifTitle, notifContent);
 
         return "Insignia otorgada exitosamente a " + recruiter.getCompanyName();
+    }
+
+    // Recalcula validationsCount (instituciones que acreditan activamente) e isValidated (umbral) de la empresa
+    private void recalculateAccreditation(RecruiterProfile recruiter) {
+        long activeCount = endorsementRepository.countByRecruiterProfileIdAndRevokedAtIsNull(recruiter.getId());
+        recruiter.setValidationsCount((int) activeCount);
+        recruiter.setIsValidated(activeCount >= ACCREDITATION_THRESHOLD);
+        recruiterRepository.save(recruiter);
     }
 
     // Retirar Insignia a una Empresa
