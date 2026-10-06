@@ -13,6 +13,9 @@ public class AgreementCreateRequestDTO {
     @NotNull(message = "El ID del postulante es obligatorio")
     private UUID postulantId;
 
+    // Opcional: si se indica, el convenio queda ligado a esa postulación y se valida que la vacante sea TRAINEE
+    private UUID jobApplicationId;
+
     @NotBlank(message = "El título del convenio es obligatorio")
     private String title;
 
