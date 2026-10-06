@@ -26,4 +26,6 @@ public class RecruiterApplicationResponseDTO {
     private Integer compatibilityPercent;
     private CompatibilityLabel compatibilityLabel;
     private String matchingHint;
+    private Double averageStars;
+    private Integer reviewCount;
 }

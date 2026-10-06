@@ -90,11 +90,13 @@ public class RecruiterController {
             @PathVariable UUID jobId,
             @RequestParam(required = false) String career,
             @RequestParam(required = false) Integer minCycle,
-            @RequestParam(required = false) String skill) {
+            @RequestParam(required = false) String skill,
+            @RequestParam(required = false) Double minRating,
+            @RequestParam(required = false) Integer minReviews) {
         User user = (User) authentication.getPrincipal();
         assert user != null;
         return ResponseEntity.ok(recruiterService.getApplicationsForJob(
-                user.getEmail(), jobId, career, minCycle, skill));
+                user.getEmail(), jobId, career, minCycle, skill, minRating, minReviews));
         /*
         Retorna las postulaciones de una vacante con resumen académico y porcentaje de afinidad.
         Filtros opcionales: career, minCycle, skill. Sin filtros, lista cronológica completa.

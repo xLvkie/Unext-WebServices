@@ -31,6 +31,7 @@ public class RecruiterService {
     private final InternshipAgreementRepository internshipAgreementRepository;
     private final NotificationService notificationService;
     private final MatchingService matchingService;
+    private final ReviewService reviewService;
 
     /* ====================================
     // Creación de nueva vacante
@@ -139,7 +140,9 @@ public class RecruiterService {
             UUID jobId,
             String career,
             Integer minCycle,
-            String skill) {
+            String skill,
+            Double minRating,
+            Integer minReviews) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
         RecruiterProfile profile = recruiterRepository.findByUserId(user.getId())
@@ -154,9 +157,10 @@ public class RecruiterService {
         List<String> requiredSkills = matchingService.requiredSkillNames(offer);
         String careerFilter = career == null ? null : career.trim();
         String skillFilter = skill == null ? null : skill.trim();
-        boolean hasFilters = (careerFilter != null && !careerFilter.isEmpty())
+        boolean hasAcademicFilters = (careerFilter != null && !careerFilter.isEmpty())
                 || minCycle != null
                 || (skillFilter != null && !skillFilter.isEmpty());
+        boolean hasReputationFilters = minRating != null || minReviews != null;
 
         List<RecruiterApplicationResponseDTO> results = applicationRepository
                 .findByJobOfferIdOrderByCreatedAtDesc(jobId)
@@ -165,6 +169,7 @@ public class RecruiterService {
                     PostulantProfile postulant = app.getPostulantProfile();
                     List<String> skills = matchingService.studentSkillNames(postulant);
                     MatchingService.MatchResult match = matchingService.evaluate(skills, requiredSkills);
+                    ReviewService.ReputationSnapshot reputation = reviewService.snapshot(postulant.getId());
                     return RecruiterApplicationResponseDTO.builder()
                             .id(app.getId())
                             .postulantProfileId(postulant.getId())
@@ -180,12 +185,21 @@ public class RecruiterService {
                             .compatibilityPercent(match.percent())
                             .compatibilityLabel(match.label())
                             .matchingHint(match.hint())
+                            .averageStars(reputation.averageStars())
+                            .reviewCount(reputation.totalReviews())
                             .build();
                 })
-                .filter(dto -> matchesFilters(dto, careerFilter, minCycle, skillFilter))
+                .filter(dto -> matchesFilters(dto, careerFilter, minCycle, skillFilter, minRating, minReviews))
                 .toList();
 
-        if (hasFilters && results.isEmpty()) {
+        if (results.isEmpty() && (hasAcademicFilters || hasReputationFilters)) {
+            if (hasReputationFilters && !hasAcademicFilters) {
+                throw new RuntimeException(ReviewService.WIDEN_REPUTATION);
+            }
+            if (hasReputationFilters) {
+                throw new RuntimeException(
+                        "No se encontraron candidatos que coincidan con estos criterios académicos y de reputación. Amplía los filtros.");
+            }
             throw new RuntimeException(MatchingService.NO_CANDIDATES_MESSAGE);
         }
         return results;
@@ -195,7 +209,9 @@ public class RecruiterService {
             RecruiterApplicationResponseDTO dto,
             String career,
             Integer minCycle,
-            String skill) {
+            String skill,
+            Double minRating,
+            Integer minReviews) {
         if (career != null && !career.isEmpty()) {
             if (dto.getCareer() == null
                     || !dto.getCareer().toLowerCase().contains(career.toLowerCase())) {
@@ -211,6 +227,16 @@ public class RecruiterService {
             boolean hasSkill = dto.getSkills() != null && dto.getSkills().stream()
                     .anyMatch(name -> name.equalsIgnoreCase(skill));
             if (!hasSkill) {
+                return false;
+            }
+        }
+        if (minRating != null) {
+            if (dto.getAverageStars() == null || dto.getAverageStars() < minRating) {
+                return false;
+            }
+        }
+        if (minReviews != null) {
+            if (dto.getReviewCount() == null || dto.getReviewCount() < minReviews) {
                 return false;
             }
         }
