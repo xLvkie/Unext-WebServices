@@ -13,9 +13,12 @@ import com.nextworks.unextwebservices.entity.enums.AgreementStatus;
 import com.nextworks.unextwebservices.entity.enums.ValidationStatus;
 import com.nextworks.unextwebservices.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -184,21 +187,7 @@ public class InstitutionService {
             agreements = agreementRepository.findByInstitutionProfileIdOrderByCreatedAtDesc(institution.getId());
         }
 
-        return agreements.stream()
-                .map(a -> AgreementResponseDTO.builder()
-                        .id(a.getId())
-                        .title(a.getTitle())
-                        .companyName(a.getRecruiterProfile().getCompanyName())
-                        .studentName(a.getPostulantProfile().getFirstName() + " " + a.getPostulantProfile().getLastName())
-                        .startDate(a.getStartDate())
-                        .endDate(a.getEndDate())
-                        .weeklyHours(a.getWeeklyHours())
-                        .documentUrl(a.getDocumentUrl())
-                        .status(a.getStatus())
-                        .observations(a.getObservations())
-                        .createdAt(a.getCreatedAt())
-                        .build())
-                .toList();
+        return agreements.stream().map(this::mapAgreementToDTO).toList();
     }
 
     // Actualizar Estado del Convenio
@@ -209,35 +198,33 @@ public class InstitutionService {
         InstitutionProfile institution = institutionRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new RuntimeException("Perfil de institución no encontrado"));
 
-        InternshipAgreement agreement = agreementRepository.findById(agreementId)
-                .orElseThrow(() -> new RuntimeException("Convenio no encontrado"));
+        // Si el convenio es de otra institución, no se revela que existe (404)
+        InternshipAgreement agreement = agreementRepository.findByIdAndInstitutionProfileId(agreementId, institution.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Convenio no encontrado"));
 
-        if (!agreement.getInstitutionProfile().getId().equals(institution.getId())) {
-            throw new RuntimeException("HTTP 403: No tienes permiso para modificar este convenio.");
+        if (agreement.getStatus() != AgreementStatus.PENDING) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "El convenio ya fue revisado");
         }
 
         if (request.getStatus() != AgreementStatus.APPROVED && request.getStatus() != AgreementStatus.REJECTED) {
-            throw new RuntimeException("HTTP 400: El estado de la evaluación solo puede ser APPROVED o REJECTED.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El estado de la evaluación solo puede ser APPROVED o REJECTED.");
+        }
+
+        if (request.getStatus() == AgreementStatus.REJECTED &&
+                (request.getObservations() == null || request.getObservations().isBlank())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Debe ingresar un motivo para el rechazo");
         }
 
         User postulantUser = agreement.getPostulantProfile().getUser();
         User recruiterUser = agreement.getRecruiterProfile().getUser();
-        String action;
+        String action = request.getStatus() == AgreementStatus.APPROVED ? "APROBADO" : "RECHAZADO";
 
-        if (request.getStatus() == AgreementStatus.APPROVED) {
-            agreement.setStatus(AgreementStatus.APPROVED);
-            if (request.getObservations() != null) {
-                agreement.setObservations(request.getObservations());
-            }
-            agreementRepository.save(agreement);
-            action = "APROBADO";
-
-        } else {
-            action = "RECHAZADO";
-            agreement.setStatus(AgreementStatus.REJECTED);
+        agreement.setStatus(request.getStatus());
+        agreement.setReviewedAt(LocalDateTime.now());
+        if (request.getObservations() != null) {
             agreement.setObservations(request.getObservations());
-            agreementRepository.delete(agreement);
         }
+        agreementRepository.save(agreement);
 
         String notifTitle = "Actualización de Convenio de Prácticas";
         String notifContent = "La institución ha " + action + " el convenio: " + agreement.getTitle() +
@@ -246,18 +233,24 @@ public class InstitutionService {
         notificationService.createNotification(postulantUser, notifTitle, notifContent);
         notificationService.createNotification(recruiterUser, notifTitle, notifContent);
 
+        return mapAgreementToDTO(agreement);
+    }
+
+    private AgreementResponseDTO mapAgreementToDTO(InternshipAgreement a) {
         return AgreementResponseDTO.builder()
-                .id(agreement.getId())
-                .title(agreement.getTitle())
-                .companyName(agreement.getRecruiterProfile().getCompanyName())
-                .studentName(agreement.getPostulantProfile().getFirstName() + " " + agreement.getPostulantProfile().getLastName())
-                .startDate(agreement.getStartDate())
-                .endDate(agreement.getEndDate())
-                .weeklyHours(agreement.getWeeklyHours())
-                .documentUrl(agreement.getDocumentUrl())
-                .status(agreement.getStatus())
-                .observations(agreement.getObservations())
-                .createdAt(agreement.getCreatedAt())
+                .id(a.getId())
+                .jobApplicationId(a.getJobApplication() != null ? a.getJobApplication().getId() : null)
+                .title(a.getTitle())
+                .companyName(a.getRecruiterProfile().getCompanyName())
+                .studentName(a.getPostulantProfile().getFirstName() + " " + a.getPostulantProfile().getLastName())
+                .startDate(a.getStartDate())
+                .endDate(a.getEndDate())
+                .weeklyHours(a.getWeeklyHours())
+                .documentUrl(a.getDocumentUrl())
+                .status(a.getStatus())
+                .observations(a.getObservations())
+                .reviewedAt(a.getReviewedAt())
+                .createdAt(a.getCreatedAt())
                 .build();
     }
 
