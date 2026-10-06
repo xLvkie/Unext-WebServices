@@ -7,6 +7,7 @@ import com.nextworks.unextwebservices.entity.User;
 import com.nextworks.unextwebservices.service.ProfileService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.core.Authentication;
@@ -14,12 +15,10 @@ import org.springframework.security.core.Authentication;
 import java.util.List;
 import java.util.UUID;
 
+@Tag(name = "2. Perfiles y Habilidades", description = "Gestión de perfiles de usuario y habilidades estudiantiles")
 @RestController
 @RequestMapping("/api/profiles")
 @RequiredArgsConstructor
-
-// http://localhost:8080/
-
 public class ProfileController {
 
     private final ProfileService profileService;

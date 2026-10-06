@@ -7,12 +7,14 @@ import com.nextworks.unextwebservices.service.ChatService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.UUID;
 
+@Tag(name = "6. Mensajería Interna", description = "Envío y consulta de mensajes directos")
 @RestController
 @RequestMapping("/api/messages")
 @RequiredArgsConstructor

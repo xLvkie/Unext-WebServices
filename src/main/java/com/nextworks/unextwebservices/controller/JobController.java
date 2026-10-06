@@ -7,6 +7,7 @@ import com.nextworks.unextwebservices.entity.JobModality;
 import com.nextworks.unextwebservices.entity.User;
 import com.nextworks.unextwebservices.service.JobService;
 import lombok.RequiredArgsConstructor;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.security.core.Authentication;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.UUID;
 
+@Tag(name = "3. Ofertas de Empleo y Postulaciones", description = "Búsqueda de empleos y postulaciones de candidatos")
 @RestController
 @RequestMapping("/api/jobs")
 @RequiredArgsConstructor

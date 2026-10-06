@@ -7,6 +7,7 @@ import com.nextworks.unextwebservices.entity.ApplicationStatus;
 import com.nextworks.unextwebservices.entity.User;
 import com.nextworks.unextwebservices.service.RecruiterService;
 import jakarta.validation.Valid;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.UUID;
 
+@Tag(name = "4. Panel Reclutador", description = "Gestión de ofertas laborales y revisión de candidatos")
 @RestController
 @RequestMapping("/api/recruiter")
 @RequiredArgsConstructor

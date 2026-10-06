@@ -29,8 +29,16 @@ public class SecurityConfig {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                        // Permitir acceso público a las rutas de login y registro
-                        .requestMatchers("/api/auth/**").permitAll()
+                        // Permitir acceso público a login, registro y documentación Swagger/OpenAPI
+                        .requestMatchers(
+                                "/api/auth/**",
+                                "/v3/api-docs/**",
+                                "/v3/api-docs",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/swagger-resources/**",
+                                "/webjars/**"
+                        ).permitAll()
                         // Cualquier otra ruta requerirá autenticación
                         .anyRequest().authenticated()
                 )
