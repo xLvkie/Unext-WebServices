@@ -6,6 +6,7 @@ import com.nextworks.unextwebservices.entity.User;
 import com.nextworks.unextwebservices.service.ValidationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -14,12 +15,10 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.UUID;
 
+@Tag(name = "5. Validaciones Estudiantiles", description = "Solicitudes de convalidación académica por parte de postulantes")
 @RestController
 @RequestMapping("/api/validations")
 @RequiredArgsConstructor
-
-// http://localhost:8080/
-
 public class ValidationController {
 
     private final ValidationService validationService;

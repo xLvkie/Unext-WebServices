@@ -6,16 +6,15 @@ import com.nextworks.unextwebservices.dto.auth.RegisterRequestDTO;
 import com.nextworks.unextwebservices.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+@Tag(name = "1. Autenticación", description = "Endpoints de registro e inicio de sesión")
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
-
-// http://localhost:8080/
-
 public class AuthController {
 
     private final AuthService authService;

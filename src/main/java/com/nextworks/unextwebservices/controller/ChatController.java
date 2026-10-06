@@ -5,6 +5,7 @@ import com.nextworks.unextwebservices.dto.chat.MessageResponseDTO;
 import com.nextworks.unextwebservices.entity.User;
 import com.nextworks.unextwebservices.service.ChatService;
 import jakarta.validation.Valid;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.UUID;
 
+@Tag(name = "9. Mensajería Interna", description = "Envío y consulta de mensajes directos e historial de conversaciones")
 @RestController
 @RequestMapping("/api/messages")
 @RequiredArgsConstructor

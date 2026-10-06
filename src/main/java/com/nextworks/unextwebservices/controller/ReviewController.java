@@ -8,6 +8,7 @@ import com.nextworks.unextwebservices.dto.review.ReviewResponseDTO;
 import com.nextworks.unextwebservices.entity.User;
 import com.nextworks.unextwebservices.service.ReviewService;
 import jakarta.validation.Valid;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
 
+@Tag(name = "8. Reseñas y Reputación", description = "Calificaciones mutuas entre empresas y postulantes, y reportes de comportamiento")
 @RestController
 @RequestMapping("/api/reviews")
 @RequiredArgsConstructor
