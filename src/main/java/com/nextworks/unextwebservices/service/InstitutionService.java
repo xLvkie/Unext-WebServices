@@ -165,9 +165,9 @@ public class InstitutionService {
         recruiterRepository.save(recruiter);
     }
 
-    // Retirar Insignia a una Empresa
+    // Retirar Insignia a una Empresa (exige motivo, no borra la fila)
     @Transactional
-    public String removeEndorsement(String email, UUID recruiterId) {
+    public String removeEndorsement(String email, UUID recruiterId, String reason) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
         InstitutionProfile institution = institutionRepository.findByUserId(user.getId())
@@ -175,13 +175,24 @@ public class InstitutionService {
 
         InstitutionEndorsement endorsement = endorsementRepository
                 .findByInstitutionProfileIdAndRecruiterProfileId(institution.getId(), recruiterId)
-                .orElseThrow(() -> new RuntimeException("La empresa no cuenta con tu insignia."));
+                .filter(e -> e.getRevokedAt() == null)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "La empresa no cuenta con tu insignia."));
 
-        endorsementRepository.delete(endorsement);
+        endorsement.setRevokedAt(LocalDateTime.now());
+        endorsement.setRevocationReason(reason);
+        endorsementRepository.save(endorsement);
+
+        RecruiterProfile recruiter = endorsement.getRecruiterProfile();
+        recalculateAccreditation(recruiter);
+
+        String notifTitle = "Insignia de Empresa Aliada retirada";
+        String notifContent = "Una institución educativa ha retirado su sello de confianza de tu perfil.";
+        notificationService.createNotification(recruiter.getUser(), notifTitle, notifContent);
+
         return "Insignia retirada exitosamente.";
     }
 
-    // Listar Empresas Aliadas
+    // Listar Empresas Aliadas (solo acreditaciones activas)
     @Transactional(readOnly = true)
     public List<EndorsedCompanyResponseDTO> getEndorsedCompanies(String email) {
         User user = userRepository.findByEmail(email)
@@ -189,7 +200,7 @@ public class InstitutionService {
         InstitutionProfile institution = institutionRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new RuntimeException("Perfil de institución no encontrado"));
 
-        return endorsementRepository.findByInstitutionProfileId(institution.getId())
+        return endorsementRepository.findByInstitutionProfileIdAndRevokedAtIsNull(institution.getId())
                 .stream()
                 .map(e -> EndorsedCompanyResponseDTO.builder()
                         .recruiterId(e.getRecruiterProfile().getId())
