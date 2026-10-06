@@ -19,4 +19,5 @@ public interface InstitutionEndorsementRepository extends JpaRepository<Institut
     List<InstitutionEndorsement> findByInstitutionProfileIdAndRevokedAtIsNull(UUID institutionId);
     // Cuantas instituciones acreditan activamente a esta empresa (para validationsCount/isValidated)
     long countByRecruiterProfileIdAndRevokedAtIsNull(UUID recruiterProfileId);
+    long countByInstitutionProfileIdAndRevokedAtIsNull(UUID institutionId);
 }

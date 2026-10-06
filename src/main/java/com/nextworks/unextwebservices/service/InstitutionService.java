@@ -315,7 +315,7 @@ public class InstitutionService {
         long verifiedStudents = postulantRepository.countByInstitutionProfileIdAndIsInstitutionVerifiedTrue(instId);
         long hiredStudents = postulantRepository.countHiredStudentsByInstitutionId(instId);
         long activeAgreements = agreementRepository.countByInstitutionProfileIdAndStatus(instId, AgreementStatus.APPROVED);
-        long endorsedCompanies = endorsementRepository.countByInstitutionProfileId(instId);
+        long endorsedCompanies = endorsementRepository.countByInstitutionProfileIdAndRevokedAtIsNull(instId);
         double rate = 0.0;
         if (verifiedStudents > 0) {
             rate = ((double) hiredStudents / verifiedStudents) * 100;
