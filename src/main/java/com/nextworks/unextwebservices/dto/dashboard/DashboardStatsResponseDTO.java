@@ -11,4 +11,5 @@ public class DashboardStatsResponseDTO {
     private long totalActiveAgreements;
     private long totalEndorsedCompanies;
     private double employabilityRate;
+    private String career;
 }

@@ -299,6 +299,27 @@ public class RecruiterService {
         return mapToDTO(offer);
     }
 
+    @Transactional
+    public JobOfferResponseDTO closeJobOffer(String email, UUID jobId) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        RecruiterProfile profile = recruiterRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new RuntimeException("Perfil no encontrado"));
+        JobOffer offer = jobOfferRepository.findById(jobId)
+                .orElseThrow(() -> new RuntimeException("Vacante no encontrada"));
+
+        if (!offer.getRecruiterProfile().getId().equals(profile.getId())) {
+            throw new RuntimeException("No puedes cerrar una vacante que no te pertenece");
+        }
+        if (!Boolean.TRUE.equals(offer.getIsActive())) {
+            throw new RuntimeException("Esta vacante ya está cerrada");
+        }
+
+        offer.setIsActive(false);
+        jobOfferRepository.save(offer);
+        return mapToDTO(offer);
+    }
+
     // LISTADO DE TODAS LAS EMPRESAS
     @Transactional(readOnly = true)
     public List<RecruiterDirectoryResponseDTO> getAllRecruiters() {

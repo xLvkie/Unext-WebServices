@@ -121,6 +121,19 @@ public class RecruiterController {
     }
 
     @PreAuthorize("hasAuthority('RECRUITER')")
+    @DeleteMapping("/jobs/{jobId}")
+    public ResponseEntity<JobOfferResponseDTO> closeJobOffer(
+            Authentication authentication,
+            @PathVariable UUID jobId) {
+        User user = (User) authentication.getPrincipal();
+        assert user != null;
+        return ResponseEntity.ok(recruiterService.closeJobOffer(user.getEmail(), jobId));
+        /*
+        Cierra la vacante: deja de aparecer en la búsqueda y no acepta postulaciones nuevas.
+         */
+    }
+
+    @PreAuthorize("hasAuthority('RECRUITER')")
     @PostMapping("/agreements")
     public ResponseEntity<AgreementResponseDTO> createAgreement(
             Authentication authentication,

@@ -13,6 +13,7 @@ import com.nextworks.unextwebservices.entity.enums.AgreementStatus;
 import com.nextworks.unextwebservices.entity.enums.ValidationStatus;
 import com.nextworks.unextwebservices.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -219,6 +220,10 @@ public class InstitutionService {
         if (request.getStatus() != AgreementStatus.APPROVED && request.getStatus() != AgreementStatus.REJECTED) {
             throw new RuntimeException("HTTP 400: El estado de la evaluación solo puede ser APPROVED o REJECTED.");
         }
+        if (request.getStatus() == AgreementStatus.REJECTED
+                && (request.getObservations() == null || request.getObservations().isBlank())) {
+            throw new RuntimeException("Debe ingresar un motivo para el rechazo");
+        }
 
         User postulantUser = agreement.getPostulantProfile().getUser();
         User recruiterUser = agreement.getRecruiterProfile().getUser();
@@ -229,19 +234,19 @@ public class InstitutionService {
             if (request.getObservations() != null) {
                 agreement.setObservations(request.getObservations());
             }
-            agreementRepository.save(agreement);
             action = "APROBADO";
-
         } else {
-            action = "RECHAZADO";
             agreement.setStatus(AgreementStatus.REJECTED);
-            agreement.setObservations(request.getObservations());
-            agreementRepository.delete(agreement);
+            agreement.setObservations(request.getObservations().trim());
+            action = "RECHAZADO";
         }
+        agreementRepository.save(agreement);
 
         String notifTitle = "Actualización de Convenio de Prácticas";
-        String notifContent = "La institución ha " + action + " el convenio: " + agreement.getTitle() +
-                (request.getObservations() != null ? ". Observaciones: " + request.getObservations() : ".");
+        String notifContent = "La institución ha " + action + " el convenio: " + agreement.getTitle()
+                + (agreement.getObservations() != null && !agreement.getObservations().isBlank()
+                ? ". Observaciones: " + agreement.getObservations()
+                : ".");
 
         notificationService.createNotification(postulantUser, notifTitle, notifContent);
         notificationService.createNotification(recruiterUser, notifTitle, notifContent);
@@ -261,32 +266,49 @@ public class InstitutionService {
                 .build();
     }
 
+    public static final String DASHBOARD_EMPTY = "No hay datos suficientes para el filtro seleccionado";
+    public static final String DASHBOARD_DB_ERROR = "Error al cargar las métricas. Por favor, intente de nuevo en unos minutos";
+
     // Obtener Estadísticas del Dashboard
     @Transactional(readOnly = true)
-    public DashboardStatsResponseDTO getDashboardStats(String email) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        InstitutionProfile institution = institutionRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new RuntimeException("Perfil de institución no encontrado"));
+    public DashboardStatsResponseDTO getDashboardStats(String email, String career) {
+        try {
+            User user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+            InstitutionProfile institution = institutionRepository.findByUserId(user.getId())
+                    .orElseThrow(() -> new RuntimeException("Perfil de institución no encontrado"));
 
-        UUID instId = institution.getId();
+            UUID instId = institution.getId();
+            String careerFilter = career == null ? null : career.trim();
+            boolean filterByCareer = careerFilter != null && !careerFilter.isEmpty();
 
-        long verifiedStudents = postulantRepository.countByInstitutionProfileIdAndIsInstitutionVerifiedTrue(instId);
-        long hiredStudents = postulantRepository.countHiredStudentsByInstitutionId(instId);
-        long activeAgreements = agreementRepository.countByInstitutionProfileIdAndStatus(instId, AgreementStatus.APPROVED);
-        long endorsedCompanies = endorsementRepository.countByInstitutionProfileId(instId);
-        double rate = 0.0;
-        if (verifiedStudents > 0) {
-            rate = ((double) hiredStudents / verifiedStudents) * 100;
+            if (filterByCareer && postulantRepository.countByInstitutionProfileIdAndCareerIgnoreCase(instId, careerFilter) == 0) {
+                throw new RuntimeException(DASHBOARD_EMPTY);
+            }
+
+            long verifiedStudents = filterByCareer
+                    ? postulantRepository.countByInstitutionProfileIdAndIsInstitutionVerifiedTrueAndCareerIgnoreCase(instId, careerFilter)
+                    : postulantRepository.countByInstitutionProfileIdAndIsInstitutionVerifiedTrue(instId);
+            long hiredStudents = filterByCareer
+                    ? postulantRepository.countHiredStudentsByInstitutionIdAndCareer(instId, careerFilter)
+                    : postulantRepository.countHiredStudentsByInstitutionId(instId);
+            long activeAgreements = filterByCareer
+                    ? agreementRepository.countByInstitutionAndStatusAndCareer(instId, AgreementStatus.APPROVED, careerFilter)
+                    : agreementRepository.countByInstitutionProfileIdAndStatus(instId, AgreementStatus.APPROVED);
+            long endorsedCompanies = endorsementRepository.countByInstitutionProfileId(instId);
+            double rate = verifiedStudents > 0 ? ((double) hiredStudents / verifiedStudents) * 100 : 0.0;
+
+            return DashboardStatsResponseDTO.builder()
+                    .totalVerifiedStudents(verifiedStudents)
+                    .totalHiredStudents(hiredStudents)
+                    .totalActiveAgreements(activeAgreements)
+                    .totalEndorsedCompanies(endorsedCompanies)
+                    .employabilityRate(Math.round(rate * 100.0) / 100.0)
+                    .career(filterByCareer ? careerFilter : null)
+                    .build();
+        } catch (DataAccessException ex) {
+            throw new RuntimeException(DASHBOARD_DB_ERROR);
         }
-
-        return DashboardStatsResponseDTO.builder()
-                .totalVerifiedStudents(verifiedStudents)
-                .totalHiredStudents(hiredStudents)
-                .totalActiveAgreements(activeAgreements)
-                .totalEndorsedCompanies(endorsedCompanies)
-                .employabilityRate(Math.round(rate * 100.0) / 100.0)
-                .build();
     }
 
     // Directorio público de instituciones para el frontend

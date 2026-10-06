@@ -24,5 +24,6 @@ public class JobOfferResponseDTO {
     private ExperienceLevel experienceLevel;
     private BigDecimal minSalary;
     private BigDecimal maxSalary;
+    private Boolean isActive;
     private LocalDateTime createdAt;
 }

@@ -120,10 +120,12 @@ public class InstitutionController {
 
     @PreAuthorize("hasAuthority('INSTITUTION')")
     @GetMapping("/dashboard/stats")
-    public ResponseEntity<DashboardStatsResponseDTO> getDashboardStats(Authentication authentication) {
+    public ResponseEntity<DashboardStatsResponseDTO> getDashboardStats(
+            Authentication authentication,
+            @RequestParam(required = false) String career) {
         User user = (User) authentication.getPrincipal();
         assert user != null;
-        return ResponseEntity.ok(institutionService.getDashboardStats(user.getEmail()));
+        return ResponseEntity.ok(institutionService.getDashboardStats(user.getEmail(), career));
     }
 
     @PreAuthorize("hasAnyAuthority('POSTULANT', 'INSTITUTION', 'RECRUITER')")

@@ -136,6 +136,7 @@ public class MatchingService {
                 .experienceLevel(offer.getExperienceLevel())
                 .minSalary(offer.getMinSalary())
                 .maxSalary(offer.getMaxSalary())
+                .isActive(offer.getIsActive())
                 .requiredSkills(requiredSkillNames(offer))
                 .createdAt(offer.getCreatedAt())
                 .build();
