@@ -1,39 +1,82 @@
-Instrucciones para el Equipo de Desarrollo: Módulo de Autenticación Unext
+    Unext - Plataforma de Empleabilidad Universitaria (Backend API)
+Unext es una plataforma integral diseñada para conectar a tres actores fundamentales en el ecosistema laboral y académico: Estudiantes (Postulantes), Instituciones Educativas (Universidades/Institutos) y Empresas (Reclutadores).
 
-El repositorio en GitHub ya cuenta con las dependencias de JWT en el pom.xml, la configuración de la conexión a PostgreSQL y todas las entidades de la base de datos mapeadas. El objetivo de este siguiente bloque de trabajo es habilitar los endpoints de registro e inicio de sesión para comenzar las pruebas oficiales en Postman.
+Este repositorio contiene el backend de la aplicación, construido bajo una arquitectura RESTful robusta, con seguridad basada en roles y flujos de negocio complejos para la gestión de prácticas pre-profesionales y reclutamiento temprano.
 
-Contexto del Sistema y Flujo de Usuarios
-La plataforma Unext está diseñada para atender a tres segmentos principales. Aunque todos comparten el mismo núcleo de autenticación, la experiencia y permisos cambian drásticamente una vez dentro del sistema:
+    🚀 Características Principales por Rol
+El sistema utiliza Spring Security y JWT para aislar las funcionalidades de cada segmento a través de Control de Acceso Basado en Roles (RBAC).
 
-Postulante: Crea y configura su perfil para navegar por el dashboard, buscar empleo, gestionar mensajería/notificaciones, subir su CV y solicitar convalidaciones académicas a su universidad.
-Empleador (Reclutador): Mantiene una interfaz similar de navegación, pero orientada a visualizar la competencia, crear vacantes laborales y obtener indicadores de "Empresa Convalidada" según las aprobaciones institucionales.
-Institución: Accede a un panel para visualizar estadísticas de sus estudiantes y cuenta con un apartado exclusivo para aprobar o rechazar las prácticas y conocimientos académicos de sus alumnos.
+    🎓 1. Segmento Institución (INSTITUTION)
+- Validación Académica: Verificación oficial de estudiantes que pertenecen a la institución.
 
-Todos los segmentos ingresan por la misma pasarela de autenticación. El token JWT que devuelva nuestro backend será el encargado de indicarle al frontend (React) qué interfaz renderizar y si el usuario debe ser redirigido obligatoriamente a completar su perfil (isProfileCompleted).
+- Gestión de Convenios de Prácticas: Revisión, aprobación o rechazo de solicitudes de convenios generadas por empresas para sus estudiantes.
 
-Pasos de Implementación en IntelliJ
+- Insignias de Confianza (Endorsements): Capacidad de otorgar y retirar el estatus de "Empresa Aliada" a reclutadores verificados.
 
-Creación de DTOs (Data Transfer Objects):
-Dentro del paquete dto, implementen las clases que estructurarán los JSON de entrada y salida. Esto evita exponer nuestras entidades de base de datos directamente al cliente.
-RegisterRequestDTO: Estructura para recibir email, password y role. Asegúrense de usar las anotaciones de validación (@NotBlank, @Email).
-LoginRequestDTO: Estructura para recibir únicamente email y password.
-AuthResponseDTO: Estructura de respuesta que devolverá el token JWT generado, el userId, el role y la bandera booleana isProfileCompleted.
+- Dashboard Analítico: Panel de estadísticas en tiempo real con métricas como la tasa de empleabilidad de sus alumnos, total de convenios activos y alumnos contratados.
 
-Configuración de Seguridad (Generación de Tokens):
-En el paquete security, desarrollen la clase JwtUtil. Esta clase se encargará de firmar digitalmente los tokens y validarlos. Debe extraer la clave secreta (jwt.secret) y el tiempo de expiración (jwt.expiration) que ya están definidos en el archivo application.properties.
 
-Lógica de Negocio (AuthService):
-Dentro del paquete service, construyan el servicio que procese las peticiones de autenticación.
+    🏢 2. Segmento Empresa (RECRUITER)
+- Gestión de Vacantes (Job Offers): Creación, actualización y publicación de ofertas laborales.
 
-Para el registro: Validen que el correo no exista ya en la base de datos, encripten la contraseña entrante (configurando un bean de BCryptPasswordEncoder) y guarden el nuevo registro en la tabla users.
-Para el login: Busquen al usuario por correo mediante el repositorio, comparen la contraseña ingresada con el hash de la base de datos y, si coinciden, utilicen JwtUtil para generar y devolver el token.
+- Solicitud de Convenios: Generación de propuestas formales de prácticas para estudiantes, enviadas automáticamente a la institución del alumno para su evaluación.
 
-Exposición de Endpoints (AuthController):
-En el paquete controller, creen el controlador REST con la ruta base /api/auth.
-Mapeen POST /api/auth/register para recibir el RegisterRequestDTO.
-Mapeen POST /api/auth/login para recibir el LoginRequestDTO y retornar el AuthResponseDTO al cliente.
+- Directorio de Talento: Acceso a un motor de búsqueda de estudiantes, priorizando perfiles que cuentan con validación institucional oficial.
 
-Pruebas Esperadas en Postman
-Una vez que el servidor de Spring Boot recompile y arranque sin errores, el equipo debe abrir Postman y certificar el flujo completo:
-Ejecutar un POST a http://localhost:8080/api/auth/register enviando un JSON con un correo, contraseña y rol (ej. POSTULANT). Validar que PostgreSQL guarde el registro.
-Ejecutar un POST a http://localhost:8080/api/auth/login con las credenciales creadas. El backend debe responder exitosamente entregando el JSON con el token JWT.
+
+    👨‍💻 3. Segmento Estudiante (POSTULANT)
+- Gestión de Perfil y Habilidades: Creación de portafolio profesional, gestión de ciclo académico y registro de habilidades técnicas con niveles de dominio.
+
+- Postulaciones Laborales: Flujo de aplicación a vacantes publicadas por las empresas.
+
+- Chat Restringido y Contextual: Comunicación directa con reclutadores (habilitado solo si hay una postulación en curso) y con su propia Institución (habilitado solo si la institución ya aprobó su vínculo académico).
+
+
+    ⚙️ 4. Módulos Transversales
+- Sistema de Notificaciones Automáticas: Gatillos en tiempo real para eventos clave (cambios de estado en convenios, nuevas postulaciones, otorgamiento de insignias).
+
+- Mensajería Directa (Chat Contextual): Motor de chat interno que diferencia entre consultas generales y mensajes específicos ligados a una postulación laboral.
+
+
+    🛠️ Stack Tecnológico
+- Lenguaje: Java 21
+
+- Framework: Spring Boot 3.x
+
+- Seguridad: Spring Security + JSON Web Tokens (JWT)
+
+- Persistencia de Datos: Spring Data JPA / Hibernate
+
+- Base de Datos: PostgreSQL
+
+- Herramientas Útiles: Lombok, Bean Validation
+
+    
+    📂 Estructura del Proyecto
+El código está organizado siguiendo los principios de separación de responsabilidades y agupación por dominio de negocio:
+
+...
+
+
+    ⚙️ Configuración y Despliegue (Local)
+1. Requisitos Previos
+   JDK 17 o superior instalado.
+
+   - PostgreSQL 14 o superior ejecutándose localmente.
+
+   - Maven para la gestión de dependencias.
+
+2. Variables de Entorno (application.properties)
+   - Configura tus credenciales de base de datos y la llave secreta JWT en src/main/resources/application.properties:
+
+3. Ejecución
+   - Puedes levantar el proyecto desde tu IDE ejecutando la clase principal UnextWebServicesApplication.java
+   - El servidor estará disponible en http://localhost:8080
+
+    
+    🔒 Autorización y Pruebas en API Clientes (Postman)
+Todos los endpoints (excepto /api/auth/**) están protegidos mediante tokens Bearer. Para realizar pruebas:
+
+- Haz un POST a /api/auth/login con tus credenciales.
+- Copia el token JWT de la respuesta.
+- En tus peticiones subsecuentes, ve a la pestaña Authorization, selecciona Bearer Token y pega el token.
