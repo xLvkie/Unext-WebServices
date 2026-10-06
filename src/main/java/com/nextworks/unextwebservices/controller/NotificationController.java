@@ -1,6 +1,6 @@
 package com.nextworks.unextwebservices.controller;
 
-import com.nextworks.unextwebservices.dto.NotificationResponseDTO;
+import com.nextworks.unextwebservices.dto.notification.NotificationResponseDTO;
 import com.nextworks.unextwebservices.entity.User;
 import com.nextworks.unextwebservices.service.NotificationService;
 import lombok.RequiredArgsConstructor;

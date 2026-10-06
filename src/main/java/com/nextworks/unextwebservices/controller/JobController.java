@@ -1,9 +1,9 @@
 package com.nextworks.unextwebservices.controller;
 
-import com.nextworks.unextwebservices.dto.ApplicationResponseDTO;
-import com.nextworks.unextwebservices.dto.JobOfferResponseDTO;
-import com.nextworks.unextwebservices.entity.ExperienceLevel;
-import com.nextworks.unextwebservices.entity.JobModality;
+import com.nextworks.unextwebservices.dto.job.ApplicationResponseDTO;
+import com.nextworks.unextwebservices.dto.job.JobOfferResponseDTO;
+import com.nextworks.unextwebservices.entity.enums.ExperienceLevel;
+import com.nextworks.unextwebservices.entity.enums.JobModality;
 import com.nextworks.unextwebservices.entity.User;
 import com.nextworks.unextwebservices.service.JobService;
 import lombok.RequiredArgsConstructor;

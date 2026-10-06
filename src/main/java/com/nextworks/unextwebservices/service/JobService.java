@@ -1,8 +1,10 @@
 package com.nextworks.unextwebservices.service;
 
-import com.nextworks.unextwebservices.dto.ApplicationResponseDTO;
-import com.nextworks.unextwebservices.dto.JobOfferResponseDTO;
+import com.nextworks.unextwebservices.dto.job.ApplicationResponseDTO;
+import com.nextworks.unextwebservices.dto.job.JobOfferResponseDTO;
 import com.nextworks.unextwebservices.entity.*;
+import com.nextworks.unextwebservices.entity.enums.ExperienceLevel;
+import com.nextworks.unextwebservices.entity.enums.JobModality;
 import com.nextworks.unextwebservices.repository.JobApplicationRepository;
 import com.nextworks.unextwebservices.repository.JobOfferRepository;
 import com.nextworks.unextwebservices.repository.PostulantProfileRepository;
@@ -24,6 +26,9 @@ public class JobService {
     private final PostulantProfileRepository postulantRepository;
     private final NotificationService notificationService;
 
+    /* ============================================
+    // Buscar, aplicar y obtener mis postulaciones
+    // ============================================ */
     @Transactional(readOnly = true)
     public List<JobOfferResponseDTO> searchJobs(String keyword, JobModality modality, ExperienceLevel experience) {
         String searchKeyword = (keyword == null) ? "" : keyword;

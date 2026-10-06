@@ -1,7 +1,7 @@
 package com.nextworks.unextwebservices.controller;
 
-import com.nextworks.unextwebservices.dto.MessageRequestDTO;
-import com.nextworks.unextwebservices.dto.MessageResponseDTO;
+import com.nextworks.unextwebservices.dto.chat.MessageRequestDTO;
+import com.nextworks.unextwebservices.dto.chat.MessageResponseDTO;
 import com.nextworks.unextwebservices.entity.User;
 import com.nextworks.unextwebservices.service.ChatService;
 import jakarta.validation.Valid;
@@ -32,7 +32,7 @@ public class ChatController {
         return ResponseEntity.ok(chatService.sendMessage(user.getEmail(), request));
         /*
         Para enviar un mensaje se pide rellenar los campos receiverId (!),
-        content (!) y jobApplicationId (1)
+        content (!) y jobApplicationId (no obligatorio :V)
         El user debe hacer uso del token y el user debe especificar el uuid del que recibe el mensaje
          */
     }

@@ -1,8 +1,8 @@
 package com.nextworks.unextwebservices.controller;
 
-import com.nextworks.unextwebservices.dto.AuthResponseDTO;
-import com.nextworks.unextwebservices.dto.LoginRequestDTO;
-import com.nextworks.unextwebservices.dto.RegisterRequestDTO;
+import com.nextworks.unextwebservices.dto.auth.AuthResponseDTO;
+import com.nextworks.unextwebservices.dto.auth.LoginRequestDTO;
+import com.nextworks.unextwebservices.dto.auth.RegisterRequestDTO;
 import com.nextworks.unextwebservices.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

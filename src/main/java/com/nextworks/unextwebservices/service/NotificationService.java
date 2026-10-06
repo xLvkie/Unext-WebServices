@@ -1,6 +1,6 @@
 package com.nextworks.unextwebservices.service;
 
-import com.nextworks.unextwebservices.dto.NotificationResponseDTO;
+import com.nextworks.unextwebservices.dto.notification.NotificationResponseDTO;
 import com.nextworks.unextwebservices.entity.Notification;
 import com.nextworks.unextwebservices.entity.User;
 import com.nextworks.unextwebservices.repository.NotificationRepository;
@@ -19,9 +19,9 @@ public class NotificationService {
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
 
-    // ---------------------------------------------------------
-    // MÉTODO INTERNO: Usado por otros servicios, no por el Controller (para mas adelante)
-    // ---------------------------------------------------------
+    /* ============================================
+    // Creación y obtención de notificacion, leido
+    // ============================================ */
     @Transactional
     public void createNotification(User user, String title, String content) {
         Notification notification = Notification.builder()

@@ -1,7 +1,7 @@
 package com.nextworks.unextwebservices.controller;
 
-import com.nextworks.unextwebservices.dto.ValidationRequestDTO;
-import com.nextworks.unextwebservices.dto.ValidationResponseDTO;
+import com.nextworks.unextwebservices.dto.validation.ValidationRequestDTO;
+import com.nextworks.unextwebservices.dto.validation.ValidationResponseDTO;
 import com.nextworks.unextwebservices.entity.User;
 import com.nextworks.unextwebservices.service.ValidationService;
 import jakarta.validation.Valid;

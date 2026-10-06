@@ -1,7 +1,7 @@
 package com.nextworks.unextwebservices.service;
 
-import com.nextworks.unextwebservices.dto.ValidationRequestDTO;
-import com.nextworks.unextwebservices.dto.ValidationResponseDTO;
+import com.nextworks.unextwebservices.dto.validation.ValidationRequestDTO;
+import com.nextworks.unextwebservices.dto.validation.ValidationResponseDTO;
 import com.nextworks.unextwebservices.entity.*;
 import com.nextworks.unextwebservices.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +22,9 @@ public class ValidationService {
     private final StudentSkillRepository studentSkillRepository;
     private final NotificationService notificationService;
 
+    /* ==============================================================
+    // Solicitar, obtener validaciones de habilidades y conexión INST
+    // ============================================================== */
     @Transactional
     public ValidationResponseDTO requestValidation(String email, ValidationRequestDTO request) {
         User user = userRepository.findByEmail(email)

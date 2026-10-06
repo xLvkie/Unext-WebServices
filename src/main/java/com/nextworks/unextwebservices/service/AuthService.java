@@ -1,8 +1,8 @@
 package com.nextworks.unextwebservices.service;
 
-import com.nextworks.unextwebservices.dto.AuthResponseDTO;
-import com.nextworks.unextwebservices.dto.LoginRequestDTO;
-import com.nextworks.unextwebservices.dto.RegisterRequestDTO;
+import com.nextworks.unextwebservices.dto.auth.AuthResponseDTO;
+import com.nextworks.unextwebservices.dto.auth.LoginRequestDTO;
+import com.nextworks.unextwebservices.dto.auth.RegisterRequestDTO;
 import com.nextworks.unextwebservices.entity.User;
 import com.nextworks.unextwebservices.repository.UserRepository;
 import com.nextworks.unextwebservices.security.JwtUtil;

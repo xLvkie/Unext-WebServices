@@ -1,7 +1,15 @@
 package com.nextworks.unextwebservices.service;
 
-import com.nextworks.unextwebservices.dto.*;
+import com.nextworks.unextwebservices.dto.agreement.AgreementCreateRequestDTO;
+import com.nextworks.unextwebservices.dto.agreement.AgreementResponseDTO;
+import com.nextworks.unextwebservices.dto.directory.RecruiterDirectoryResponseDTO;
+import com.nextworks.unextwebservices.dto.job.ApplicationResponseDTO;
+import com.nextworks.unextwebservices.dto.job.JobOfferRequestDTO;
+import com.nextworks.unextwebservices.dto.job.JobOfferResponseDTO;
+import com.nextworks.unextwebservices.dto.job.JobOfferUpdateDTO;
 import com.nextworks.unextwebservices.entity.*;
+import com.nextworks.unextwebservices.entity.enums.AgreementStatus;
+import com.nextworks.unextwebservices.entity.enums.ApplicationStatus;
 import com.nextworks.unextwebservices.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -18,8 +26,9 @@ public class RecruiterService {
     private final JobApplicationRepository applicationRepository;
     private final UserRepository userRepository;
     private final RecruiterProfileRepository recruiterRepository;
-
-    // Notificación automatica al momento de cambiar el estado de la vacante
+    private final PostulantProfileRepository postulantRepository;
+    private final InstitutionProfileRepository institutionRepository;
+    private final InternshipAgreementRepository internshipAgreementRepository;
     private final NotificationService notificationService;
 
     /* ====================================
@@ -118,7 +127,9 @@ public class RecruiterService {
                 .build();
     }
 
-    // 1. Obtener todas las vacantes creadas por este reclutador
+    /* ============================================
+    // Obtener, Mas info, Editar vacante de empresa
+    // ============================================ */
     @Transactional(readOnly = true)
     public List<JobOfferResponseDTO> getMyJobOffers(String email) {
         User user = userRepository.findByEmail(email)
@@ -130,7 +141,6 @@ public class RecruiterService {
                 .stream().map(this::mapToDTO).toList();
     }
 
-    // 2. Ver quiénes han postulado a una vacante específica
     @Transactional(readOnly = true)
     public List<ApplicationResponseDTO> getApplicationsForJob(String email, UUID jobId) {
         User user = userRepository.findByEmail(email)
@@ -155,7 +165,6 @@ public class RecruiterService {
                 .toList();
     }
 
-    // 3. Editar la vacante y notificar a los postulantes
     @Transactional
     public JobOfferResponseDTO updateJobOffer(String email, UUID jobId, JobOfferUpdateDTO request) {
         User user = userRepository.findByEmail(email)
@@ -165,12 +174,10 @@ public class RecruiterService {
         JobOffer offer = jobOfferRepository.findById(jobId)
                 .orElseThrow(() -> new RuntimeException("Vacante no encontrada"));
 
-        // Validar propiedad
         if (!offer.getRecruiterProfile().getId().equals(profile.getId())) {
             throw new RuntimeException("No puedes editar una vacante que no te pertenece");
         }
 
-        // Actualizar datos
         if (request.getTitle() != null && !request.getTitle().isBlank()) {
             offer.setTitle(request.getTitle());
         }
@@ -198,17 +205,12 @@ public class RecruiterService {
 
         jobOfferRepository.save(offer);
 
-        // =========================================================
-        // GATILLO AUTOMÁTICO EN CASCADA
-        // =========================================================
-        List<JobApplication> applications = applicationRepository.findByJobOfferIdOrderByCreatedAtDesc(jobId);
 
+        List<JobApplication> applications = applicationRepository.findByJobOfferIdOrderByCreatedAtDesc(jobId);
         for (JobApplication app : applications) {
-            // Solo notificamos a los que siguen activos en el proceso
             if (app.getStatus() == ApplicationStatus.RECEIVED || app.getStatus() == ApplicationStatus.UNDER_REVIEW) {
                 String notifTitle = "Actualización en la vacante: " + offer.getTitle();
                 String notifContent = "La empresa " + profile.getCompanyName() + " ha modificado las condiciones, requisitos o rango salarial de la vacante a la que postulaste. Revisa los nuevos detalles.";
-
                 notificationService.createNotification(app.getPostulantProfile().getUser(), notifTitle, notifContent);
             }
         }
@@ -216,14 +218,72 @@ public class RecruiterService {
         return mapToDTO(offer);
     }
 
-    // Devuelve el listado de empresas
+    // LISTADO DE TODAS LAS EMPRESAS
     @Transactional(readOnly = true)
     public List<RecruiterDirectoryResponseDTO> getAllRecruiters() {
         return recruiterRepository.findAll().stream()
                 .map(r -> RecruiterDirectoryResponseDTO.builder()
                         .id(r.getId())
+                        .userId(r.getUser().getId())
                         .companyName(r.getCompanyName())
                         .build())
                 .toList();
+    }
+
+    /* ==============================================
+    // Creación de convenio reclutador - insti - post
+    // ============================================== */
+    @Transactional
+    public AgreementResponseDTO createAgreement(String email, AgreementCreateRequestDTO request) {
+        // Identificar a la Empresa que hace la solicitud
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        RecruiterProfile recruiter = recruiterRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new RuntimeException("Perfil de reclutador no encontrado"));
+
+        // Identificar al Alumno
+        PostulantProfile postulant = postulantRepository.findById(request.getPostulantId())
+                .orElseThrow(() -> new RuntimeException("Postulante no encontrado"));
+
+        // Validar que el alumno tenga el respaldo de una Institución
+        if (postulant.getInstitutionProfile() == null || !postulant.getIsInstitutionVerified()) {
+            throw new RuntimeException("HTTP 400: No se puede crear un convenio institucional porque el estudiante no está verificado por ninguna universidad.");
+        }
+
+        InstitutionProfile institution = postulant.getInstitutionProfile();
+        InternshipAgreement agreement = InternshipAgreement.builder()
+                .title(request.getTitle())
+                .recruiterProfile(recruiter)
+                .postulantProfile(postulant)
+                .institutionProfile(institution)
+                .startDate(request.getStartDate())
+                .endDate(request.getEndDate())
+                .weeklyHours(request.getWeeklyHours())
+                .documentUrl(request.getDocumentUrl())
+                .observations(request.getObservations())
+                .status(AgreementStatus.PENDING)
+                .build();
+
+        internshipAgreementRepository.save(agreement);
+
+        String notifTitle = "Nuevo Convenio de Prácticas: " + request.getTitle();
+        String notifContent = "La empresa " + recruiter.getCompanyName() +
+                " ha registrado un convenio para tu alumno " + postulant.getFirstName() +
+                ". Por favor, revisa el documento y aprueba la solicitud.";
+        notificationService.createNotification(institution.getUser(), notifTitle, notifContent);
+
+        return AgreementResponseDTO.builder()
+                .id(agreement.getId())
+                .title(agreement.getTitle())
+                .companyName(recruiter.getCompanyName())
+                .studentName(postulant.getFirstName() + " " + postulant.getLastName())
+                .startDate(agreement.getStartDate())
+                .endDate(agreement.getEndDate())
+                .weeklyHours(agreement.getWeeklyHours())
+                .documentUrl(agreement.getDocumentUrl())
+                .status(agreement.getStatus())
+                .observations(agreement.getObservations())
+                .createdAt(agreement.getCreatedAt()) // Asegúrate de que el @PrePersist de tu entidad le asigne valor
+                .build();
     }
 }

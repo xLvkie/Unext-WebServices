@@ -1,10 +1,13 @@
 package com.nextworks.unextwebservices.service;
 
-import com.nextworks.unextwebservices.dto.MessageRequestDTO;
-import com.nextworks.unextwebservices.dto.MessageResponseDTO;
+import com.nextworks.unextwebservices.dto.chat.MessageRequestDTO;
+import com.nextworks.unextwebservices.dto.chat.MessageResponseDTO;
 import com.nextworks.unextwebservices.entity.*;
+import com.nextworks.unextwebservices.entity.enums.ApplicationStatus;
+import com.nextworks.unextwebservices.entity.enums.ChatContext;
 import com.nextworks.unextwebservices.repository.JobApplicationRepository;
 import com.nextworks.unextwebservices.repository.MessageRepository;
+import com.nextworks.unextwebservices.repository.PostulantProfileRepository;
 import com.nextworks.unextwebservices.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -20,6 +23,7 @@ public class ChatService {
     private final MessageRepository messageRepository;
     private final UserRepository userRepository;
     private final JobApplicationRepository applicationRepository;
+    private final PostulantProfileRepository postulantRepository;
 
     @Transactional
     public MessageResponseDTO sendMessage(String email, MessageRequestDTO request) {
@@ -37,7 +41,8 @@ public class ChatService {
 
         String senderRole = sender.getRole().name();
         String receiverRole = receiver.getRole().name();
-        // Validación al segmeto POSTULANTE
+
+        // Validación al segmento POSTULANTE
         if (senderRole.equals("POSTULANT")) {
             // Caso 1: Postulante -> Reclutador
             if (receiverRole.equals("RECRUITER")) {
@@ -50,8 +55,24 @@ public class ChatService {
             }
             // Caso 2: Postulante -> Institución
             else if (receiverRole.equals("INSTITUTION")) {
-                // TODO: Implementar lógica de conexión Postulante - Institución
-                throw new RuntimeException("HTTP 403: La validación de conexión con la institución aún no está configurada.");
+                // Busqueda del perfil del postulante usando su ID de user
+                PostulantProfile postulant = postulantRepository.findByUserId(sender.getId())
+                        .orElseThrow(() -> new RuntimeException("Perfil de postulante no encontrado"));
+
+                // Validación que este vinculado a una institución
+                if (postulant.getInstitutionProfile() == null) {
+                    throw new RuntimeException("HTTP 403: No puedes contactar a esta institución porque no tienes un vínculo académico registrado.");
+                }
+
+                // Validación que el ID de la institución sea la que reciba el mensaje
+                if (!postulant.getInstitutionProfile().getUser().getId().equals(receiver.getId())) {
+                    throw new RuntimeException("HTTP 403: Solo puedes comunicarte con tu propia institución.");
+                }
+
+                // Validación que su conexión ya este APPROVED
+                if (!postulant.getIsInstitutionVerified()) {
+                    throw new RuntimeException("HTTP 403: Tu vínculo académico aún está en estado PENDING. Espera la aprobación para usar el chat.");
+                }
             }
         }
 

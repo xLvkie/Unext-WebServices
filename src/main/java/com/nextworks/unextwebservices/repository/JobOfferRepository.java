@@ -1,7 +1,7 @@
 package com.nextworks.unextwebservices.repository;
 
-import com.nextworks.unextwebservices.entity.ExperienceLevel;
-import com.nextworks.unextwebservices.entity.JobModality;
+import com.nextworks.unextwebservices.entity.enums.ExperienceLevel;
+import com.nextworks.unextwebservices.entity.enums.JobModality;
 import com.nextworks.unextwebservices.entity.JobOffer;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;

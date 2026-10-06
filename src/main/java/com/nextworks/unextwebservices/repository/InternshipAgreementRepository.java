@@ -1,6 +1,6 @@
 package com.nextworks.unextwebservices.repository;
 
-import com.nextworks.unextwebservices.entity.AgreementStatus;
+import com.nextworks.unextwebservices.entity.enums.AgreementStatus;
 import com.nextworks.unextwebservices.entity.InternshipAgreement;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;

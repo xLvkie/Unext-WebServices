@@ -1,9 +1,16 @@
 package com.nextworks.unextwebservices.controller;
 
-import com.nextworks.unextwebservices.dto.*;
-import com.nextworks.unextwebservices.entity.AgreementStatus;
+import com.nextworks.unextwebservices.dto.agreement.AgreementResponseDTO;
+import com.nextworks.unextwebservices.dto.agreement.AgreementUpdateRequestDTO;
+import com.nextworks.unextwebservices.dto.dashboard.DashboardStatsResponseDTO;
+import com.nextworks.unextwebservices.dto.directory.InstitutionDirectoryResponseDTO;
+import com.nextworks.unextwebservices.dto.validation.EndorsedCompanyResponseDTO;
+import com.nextworks.unextwebservices.dto.validation.PendingStudentResponseDTO;
+import com.nextworks.unextwebservices.dto.validation.PendingValidationResponseDTO;
+import com.nextworks.unextwebservices.dto.validation.ValidationUpdateDTO;
+import com.nextworks.unextwebservices.entity.enums.AgreementStatus;
 import com.nextworks.unextwebservices.entity.User;
-import com.nextworks.unextwebservices.entity.ValidationStatus;
+import com.nextworks.unextwebservices.entity.enums.ValidationStatus;
 import com.nextworks.unextwebservices.service.InstitutionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -45,7 +52,7 @@ public class InstitutionController {
         assert user != null;
         return ResponseEntity.ok(institutionService.updateStudentAssociation(user.getEmail(), postulantId, status));
         /*
-        Aprueba la asosiación academica, solo acepta el parametro verify
+        Aprueba la asosiación academica, solo acepta el parametro APPROVED, REJECT
         El user requiere uso del token
         verify?status=APPROVED etc
          */
@@ -59,6 +66,9 @@ public class InstitutionController {
         User user = (User) authentication.getPrincipal();
         assert user != null;
         return ResponseEntity.ok(institutionService.endorseCompany(user.getEmail(), recruiterId));
+        /*
+        Otorga una insignia de verificación a la empresa, es necesario el <ID DE LA EMPRESA>
+         */
     }
 
     @PreAuthorize("hasAuthority('INSTITUTION')")
@@ -69,6 +79,9 @@ public class InstitutionController {
         User user = (User) authentication.getPrincipal();
         assert user != null;
         return ResponseEntity.ok(institutionService.removeEndorsement(user.getEmail(), recruiterId));
+        /*
+        Elimina una insignia de verificación a la empresa, es necesario el <ID DE LA EMPRESA>
+         */
     }
 
     @PreAuthorize("hasAuthority('INSTITUTION')")
@@ -77,30 +90,33 @@ public class InstitutionController {
         User user = (User) authentication.getPrincipal();
         assert user != null;
         return ResponseEntity.ok(institutionService.getEndorsedCompanies(user.getEmail()));
+        /*
+        Obtiene un listado de todas las empresa a las que se dio una insignia
+         */
     }
 
-    @PreAuthorize("hasAuthority('INSTITUTION')")
-    @GetMapping("/agreements")
-    public ResponseEntity<List<AgreementResponseDTO>> getAgreements(
-            Authentication authentication,
-            @RequestParam(required = false) AgreementStatus status) {
+        @PreAuthorize("hasAuthority('INSTITUTION')")
+        @GetMapping("/agreements")
+        public ResponseEntity<List<AgreementResponseDTO>> getAgreements(
+                Authentication authentication,
+                @RequestParam(required = false) AgreementStatus status) {
 
-        User user = (User) authentication.getPrincipal();
-        assert user != null;
-        return ResponseEntity.ok(institutionService.getAgreements(user.getEmail(), status));
-    }
+            User user = (User) authentication.getPrincipal();
+            assert user != null;
+            return ResponseEntity.ok(institutionService.getAgreements(user.getEmail(), status));
+        }
 
-    @PreAuthorize("hasAuthority('INSTITUTION')")
-    @PatchMapping("/agreements/{agreementId}/status")
-    public ResponseEntity<AgreementResponseDTO> updateAgreementStatus(
-            Authentication authentication,
-            @PathVariable UUID agreementId,
-            @Valid @RequestBody AgreementUpdateRequestDTO request) {
+        @PreAuthorize("hasAuthority('INSTITUTION')")
+        @PatchMapping("/agreements/{agreementId}/status")
+        public ResponseEntity<AgreementResponseDTO> updateAgreementStatus(
+                Authentication authentication,
+                @PathVariable UUID agreementId,
+                @Valid @RequestBody AgreementUpdateRequestDTO request) {
 
-        User user = (User) authentication.getPrincipal();
-        assert user != null;
-        return ResponseEntity.ok(institutionService.updateAgreementStatus(user.getEmail(), agreementId, request));
-    }
+            User user = (User) authentication.getPrincipal();
+            assert user != null;
+            return ResponseEntity.ok(institutionService.updateAgreementStatus(user.getEmail(), agreementId, request));
+        }
 
     @PreAuthorize("hasAuthority('INSTITUTION')")
     @GetMapping("/dashboard/stats")
@@ -133,7 +149,7 @@ public class InstitutionController {
     public ResponseEntity<String> updateSkillValidationStatus(
             Authentication authentication,
             @PathVariable UUID validationId,
-            @Valid @RequestBody ValidationUpdateRequestDTO request) {
+            @Valid @RequestBody ValidationUpdateDTO request) {
 
         User user = (User) authentication.getPrincipal();
         assert user != null;

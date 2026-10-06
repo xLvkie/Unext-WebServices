@@ -1,7 +1,16 @@
 package com.nextworks.unextwebservices.service;
 
-import com.nextworks.unextwebservices.dto.*;
+import com.nextworks.unextwebservices.dto.agreement.AgreementResponseDTO;
+import com.nextworks.unextwebservices.dto.agreement.AgreementUpdateRequestDTO;
+import com.nextworks.unextwebservices.dto.dashboard.DashboardStatsResponseDTO;
+import com.nextworks.unextwebservices.dto.directory.InstitutionDirectoryResponseDTO;
+import com.nextworks.unextwebservices.dto.validation.EndorsedCompanyResponseDTO;
+import com.nextworks.unextwebservices.dto.validation.PendingStudentResponseDTO;
+import com.nextworks.unextwebservices.dto.validation.PendingValidationResponseDTO;
+import com.nextworks.unextwebservices.dto.validation.ValidationUpdateDTO;
 import com.nextworks.unextwebservices.entity.*;
+import com.nextworks.unextwebservices.entity.enums.AgreementStatus;
+import com.nextworks.unextwebservices.entity.enums.ValidationStatus;
 import com.nextworks.unextwebservices.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -45,7 +54,7 @@ public class InstitutionService {
                 .toList();
     }
 
-    // Aprobar o desaprobar el perfil del alumno y disparar gatillo
+    // Aprobar o desaprobar el perfil del alumno
     @Transactional
     public String updateStudentAssociation(String email, UUID postulantId, ValidationStatus status) {
         User user = userRepository.findByEmail(email)
@@ -192,7 +201,7 @@ public class InstitutionService {
                 .toList();
     }
 
-    // Actualizar Estado del Convenio (Aprobar/Rechazar) y Notificar
+    // Actualizar Estado del Convenio
     @Transactional
     public AgreementResponseDTO updateAgreementStatus(String email, UUID agreementId, AgreementUpdateRequestDTO request) {
         User user = userRepository.findByEmail(email)
@@ -204,30 +213,51 @@ public class InstitutionService {
                 .orElseThrow(() -> new RuntimeException("Convenio no encontrado"));
 
         if (!agreement.getInstitutionProfile().getId().equals(institution.getId())) {
-            throw new RuntimeException("No tienes permiso para modificar este convenio.");
+            throw new RuntimeException("HTTP 403: No tienes permiso para modificar este convenio.");
         }
 
-        agreement.setStatus(request.getStatus());
-        if (request.getObservations() != null) {
-            agreement.setObservations(request.getObservations());
+        if (request.getStatus() != AgreementStatus.APPROVED && request.getStatus() != AgreementStatus.REJECTED) {
+            throw new RuntimeException("HTTP 400: El estado de la evaluación solo puede ser APPROVED o REJECTED.");
         }
-
-        agreementRepository.save(agreement);
 
         User postulantUser = agreement.getPostulantProfile().getUser();
         User recruiterUser = agreement.getRecruiterProfile().getUser();
+        String action;
+
+        if (request.getStatus() == AgreementStatus.APPROVED) {
+            agreement.setStatus(AgreementStatus.APPROVED);
+            if (request.getObservations() != null) {
+                agreement.setObservations(request.getObservations());
+            }
+            agreementRepository.save(agreement);
+            action = "APROBADO";
+
+        } else {
+            action = "RECHAZADO";
+            agreement.setStatus(AgreementStatus.REJECTED);
+            agreement.setObservations(request.getObservations());
+            agreementRepository.delete(agreement);
+        }
+
         String notifTitle = "Actualización de Convenio de Prácticas";
-        String notifContent = "La institución ha " +
-                (request.getStatus() == AgreementStatus.APPROVED ? "APROBADO" : "RECHAZADO") +
-                " el convenio: " + agreement.getTitle() + ".";
+        String notifContent = "La institución ha " + action + " el convenio: " + agreement.getTitle() +
+                (request.getObservations() != null ? ". Observaciones: " + request.getObservations() : ".");
 
         notificationService.createNotification(postulantUser, notifTitle, notifContent);
         notificationService.createNotification(recruiterUser, notifTitle, notifContent);
 
         return AgreementResponseDTO.builder()
                 .id(agreement.getId())
+                .title(agreement.getTitle())
+                .companyName(agreement.getRecruiterProfile().getCompanyName())
+                .studentName(agreement.getPostulantProfile().getFirstName() + " " + agreement.getPostulantProfile().getLastName())
+                .startDate(agreement.getStartDate())
+                .endDate(agreement.getEndDate())
+                .weeklyHours(agreement.getWeeklyHours())
+                .documentUrl(agreement.getDocumentUrl())
                 .status(agreement.getStatus())
                 .observations(agreement.getObservations())
+                .createdAt(agreement.getCreatedAt())
                 .build();
     }
 
@@ -241,13 +271,10 @@ public class InstitutionService {
 
         UUID instId = institution.getId();
 
-        // Ejecutar las consultas agregadas
         long verifiedStudents = postulantRepository.countByInstitutionProfileIdAndIsInstitutionVerifiedTrue(instId);
         long hiredStudents = postulantRepository.countHiredStudentsByInstitutionId(instId);
         long activeAgreements = agreementRepository.countByInstitutionProfileIdAndStatus(instId, AgreementStatus.APPROVED);
         long endorsedCompanies = endorsementRepository.countByInstitutionProfileId(instId);
-
-        // Calcular el porcentaje de inserción laboral (evitando división por cero)
         double rate = 0.0;
         if (verifiedStudents > 0) {
             rate = ((double) hiredStudents / verifiedStudents) * 100;
@@ -258,7 +285,6 @@ public class InstitutionService {
                 .totalHiredStudents(hiredStudents)
                 .totalActiveAgreements(activeAgreements)
                 .totalEndorsedCompanies(endorsedCompanies)
-                // Redondear a dos decimales
                 .employabilityRate(Math.round(rate * 100.0) / 100.0)
                 .build();
     }
@@ -298,7 +324,7 @@ public class InstitutionService {
 
     // Aprobar o Rechazar la validación y notificar al alumno
     @Transactional
-    public String updateSkillValidationStatus(String email, UUID validationId, ValidationUpdateRequestDTO request) {
+    public String updateSkillValidationStatus(String email, UUID validationId, ValidationUpdateDTO request) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
         InstitutionProfile institution = institutionRepository.findByUserId(user.getId())
@@ -318,7 +344,6 @@ public class InstitutionService {
 
         academicValidationRepository.save(validation);
 
-        // Envio de notificación al postulante
         String notifTitle = "Actualización de Habilidad";
         String notifContent = "Tu solicitud de validación académica para la habilidad '" +
                 validation.getTechnicalSkill().getName() + "' ha sido " +

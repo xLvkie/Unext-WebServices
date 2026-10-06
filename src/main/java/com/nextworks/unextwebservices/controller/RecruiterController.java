@@ -1,7 +1,13 @@
 package com.nextworks.unextwebservices.controller;
 
-import com.nextworks.unextwebservices.dto.*;
-import com.nextworks.unextwebservices.entity.ApplicationStatus;
+import com.nextworks.unextwebservices.dto.agreement.AgreementCreateRequestDTO;
+import com.nextworks.unextwebservices.dto.agreement.AgreementResponseDTO;
+import com.nextworks.unextwebservices.dto.directory.RecruiterDirectoryResponseDTO;
+import com.nextworks.unextwebservices.dto.job.ApplicationResponseDTO;
+import com.nextworks.unextwebservices.dto.job.JobOfferRequestDTO;
+import com.nextworks.unextwebservices.dto.job.JobOfferResponseDTO;
+import com.nextworks.unextwebservices.dto.job.JobOfferUpdateDTO;
+import com.nextworks.unextwebservices.entity.enums.ApplicationStatus;
 import com.nextworks.unextwebservices.entity.User;
 import com.nextworks.unextwebservices.service.RecruiterService;
 import jakarta.validation.Valid;
@@ -105,5 +111,16 @@ public class RecruiterController {
         location, modality, experienceLevel, minSalary, maxSalary
         Se quiere que el User use su token
          */
+    }
+
+    @PreAuthorize("hasAuthority('RECRUITER')")
+    @PostMapping("/agreements")
+    public ResponseEntity<AgreementResponseDTO> createAgreement(
+            Authentication authentication,
+            @Valid @RequestBody AgreementCreateRequestDTO request) {
+
+        User user = (User) authentication.getPrincipal();
+        assert user != null;
+        return ResponseEntity.ok(recruiterService.createAgreement(user.getEmail(), request));
     }
 }

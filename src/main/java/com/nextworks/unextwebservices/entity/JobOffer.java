@@ -1,5 +1,7 @@
 package com.nextworks.unextwebservices.entity;
 
+import com.nextworks.unextwebservices.entity.enums.ExperienceLevel;
+import com.nextworks.unextwebservices.entity.enums.JobModality;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;

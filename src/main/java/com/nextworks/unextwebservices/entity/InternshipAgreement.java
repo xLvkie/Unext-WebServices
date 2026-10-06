@@ -1,5 +1,6 @@
 package com.nextworks.unextwebservices.entity;
 
+import com.nextworks.unextwebservices.entity.enums.AgreementStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDate;

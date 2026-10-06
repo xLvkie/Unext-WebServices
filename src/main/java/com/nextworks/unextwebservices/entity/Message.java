@@ -1,5 +1,6 @@
 package com.nextworks.unextwebservices.entity;
 
+import com.nextworks.unextwebservices.entity.enums.ChatContext;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -21,8 +22,7 @@ public class Message {
     @Enumerated(EnumType.STRING)
     @Column(name = "context_type", nullable = false, length = 50)
     private ChatContext contextType;
-
-    // Relación opcional: Solo requerida si el contextType es JOB_APPLICATION
+    
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "job_application_id")
     private JobApplication jobApplication;

@@ -1,7 +1,7 @@
 package com.nextworks.unextwebservices.repository;
 
 import com.nextworks.unextwebservices.entity.AcademicValidation;
-import com.nextworks.unextwebservices.entity.ValidationStatus;
+import com.nextworks.unextwebservices.entity.enums.ValidationStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

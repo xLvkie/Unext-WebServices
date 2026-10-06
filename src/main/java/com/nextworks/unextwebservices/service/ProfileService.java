@@ -1,7 +1,7 @@
 package com.nextworks.unextwebservices.service;
 
-import com.nextworks.unextwebservices.dto.*;
-
+import com.nextworks.unextwebservices.dto.directory.PostulantDirectoryResponseDTO;
+import com.nextworks.unextwebservices.dto.profile.*;
 import com.nextworks.unextwebservices.entity.*;
 
 import com.nextworks.unextwebservices.repository.*;
@@ -263,6 +263,7 @@ public class ProfileService {
                 .build();
     }
 
+    // LISTADO DE HABILIDADES
     @Transactional(readOnly = true)
     public List<StudentSkillResponseDTO> getMySkills(String email) {
         User user = userRepository.findByEmail(email)
@@ -283,6 +284,7 @@ public class ProfileService {
                 .toList();
     }
 
+    // ACTUALIZAR HABILIDAD TECNICA
     @Transactional
     public StudentSkillResponseDTO updateSkill(String email, UUID skillId, StudentSkillUpdateDTO request) {
         User user = userRepository.findByEmail(email)
@@ -311,6 +313,7 @@ public class ProfileService {
                 .build();
     }
 
+    // ELIMINAR HABILIDAD TECNICA
     @Transactional
     public void deleteSkill(String email, UUID skillId) {
         User user = userRepository.findByEmail(email)
@@ -328,5 +331,21 @@ public class ProfileService {
         }
 
         studentSkillRepository.delete(skill);
+    }
+
+    // LISTADO DE TODOS LOS POSTULANTES
+    @Transactional(readOnly = true)
+    public List<PostulantDirectoryResponseDTO> getAllPostulants() {
+        List<PostulantProfile> postulants = postulantRepository.findAll();
+
+        return postulants.stream().map(profile -> PostulantDirectoryResponseDTO.builder()
+                .id(profile.getId())
+                .userId(profile.getUser().getId())
+                .firstName(profile.getFirstName())
+                .lastName(profile.getLastName())
+                .career(profile.getCareer())
+                .isInstitutionVerified(profile.getIsInstitutionVerified())
+                .build()
+        ).toList();
     }
 }

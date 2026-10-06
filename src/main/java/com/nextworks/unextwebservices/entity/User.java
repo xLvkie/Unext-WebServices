@@ -1,5 +1,6 @@
 package com.nextworks.unextwebservices.entity;
 
+import com.nextworks.unextwebservices.entity.enums.Role;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;

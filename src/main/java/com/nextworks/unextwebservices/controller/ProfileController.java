@@ -1,7 +1,7 @@
 package com.nextworks.unextwebservices.controller;
 
-import com.nextworks.unextwebservices.dto.*;
-
+import com.nextworks.unextwebservices.dto.directory.PostulantDirectoryResponseDTO;
+import com.nextworks.unextwebservices.dto.profile.*;
 import com.nextworks.unextwebservices.entity.User;
 
 import com.nextworks.unextwebservices.service.ProfileService;
@@ -20,7 +20,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 
 // http://localhost:8080/
-// De ahora en adelante es obligatorio el uso del bearer token
 
 public class ProfileController {
 
@@ -215,5 +214,17 @@ public class ProfileController {
         Elimina un habilidad mediante el <ID DE LA HABILIDAD>
         Se debe hacer uso del bearer token del usuario
          */
+    }
+
+    @PreAuthorize("hasAnyAuthority('RECRUITER', 'INSTITUTION', 'POSTULANT')")
+    @GetMapping("/postulants/directory")
+    public ResponseEntity<List<PostulantDirectoryResponseDTO>> getAllPostulants(Authentication authentication) {
+        User user = (User) authentication.getPrincipal();
+        assert user != null;
+
+        return ResponseEntity.ok(profileService.getAllPostulants());
+        /*
+        Devuelve el directorio público de todos los estudiantes de la plataforma.
+        */
     }
 }
