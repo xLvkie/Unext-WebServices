@@ -26,6 +26,9 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class InstitutionService {
 
+    // Numero minimo de instituciones que deben acreditar activamente a una empresa para que obtenga la insignia
+    private static final int ACCREDITATION_THRESHOLD = 1;
+
     private final InstitutionProfileRepository institutionRepository;
     private final PostulantProfileRepository postulantRepository;
     private final UserRepository userRepository;
@@ -109,7 +112,7 @@ public class InstitutionService {
         return responseMessage;
     }
 
-    // Otorgar Insignia a una Empresa
+    // Otorgar Insignia a una Empresa: solo si la institucion tiene al menos un convenio APPROVED con ella
     @Transactional
     public String endorseCompany(String email, UUID recruiterId) {
         User user = userRepository.findByEmail(email)
@@ -118,18 +121,34 @@ public class InstitutionService {
                 .orElseThrow(() -> new RuntimeException("Perfil de institución no encontrado"));
 
         RecruiterProfile recruiter = recruiterRepository.findById(recruiterId)
-                .orElseThrow(() -> new RuntimeException("Empresa no encontrada"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Empresa no encontrada"));
 
-        if (endorsementRepository.existsByInstitutionProfileIdAndRecruiterProfileId(institution.getId(), recruiterId)) {
-            throw new RuntimeException("Esta empresa ya cuenta con tu insignia de confianza.");
+        if (!agreementRepository.existsByInstitutionProfileIdAndRecruiterProfileIdAndStatus(
+                institution.getId(), recruiterId, AgreementStatus.APPROVED)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Solo puedes acreditar empresas con convenios aprobados");
         }
 
-        InstitutionEndorsement endorsement = InstitutionEndorsement.builder()
-                .institutionProfile(institution)
-                .recruiterProfile(recruiter)
-                .build();
+        InstitutionEndorsement endorsement = endorsementRepository
+                .findByInstitutionProfileIdAndRecruiterProfileId(institution.getId(), recruiterId)
+                .orElse(null);
+
+        if (endorsement != null && endorsement.getRevokedAt() == null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Esta empresa ya cuenta con tu insignia de confianza.");
+        }
+
+        if (endorsement != null) {
+            // Ya existia (estaba revocada): se reactiva en vez de crear una fila nueva
+            endorsement.setRevokedAt(null);
+            endorsement.setRevocationReason(null);
+        } else {
+            endorsement = InstitutionEndorsement.builder()
+                    .institutionProfile(institution)
+                    .recruiterProfile(recruiter)
+                    .build();
+        }
 
         endorsementRepository.save(endorsement);
+        recalculateAccreditation(recruiter);
 
         String notifTitle = "¡Insignia de Empresa Aliada!";
         String notifContent = "Una institución educativa te ha otorgado su sello de confianza. Tus vacantes ahora destacarán para sus alumnos.";
@@ -138,9 +157,17 @@ public class InstitutionService {
         return "Insignia otorgada exitosamente a " + recruiter.getCompanyName();
     }
 
-    // Retirar Insignia a una Empresa
+    // Recalcula validationsCount (instituciones que acreditan activamente) e isValidated (umbral) de la empresa
+    private void recalculateAccreditation(RecruiterProfile recruiter) {
+        long activeCount = endorsementRepository.countByRecruiterProfileIdAndRevokedAtIsNull(recruiter.getId());
+        recruiter.setValidationsCount((int) activeCount);
+        recruiter.setIsValidated(activeCount >= ACCREDITATION_THRESHOLD);
+        recruiterRepository.save(recruiter);
+    }
+
+    // Retirar Insignia a una Empresa (exige motivo, no borra la fila)
     @Transactional
-    public String removeEndorsement(String email, UUID recruiterId) {
+    public String removeEndorsement(String email, UUID recruiterId, String reason) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
         InstitutionProfile institution = institutionRepository.findByUserId(user.getId())
@@ -148,13 +175,24 @@ public class InstitutionService {
 
         InstitutionEndorsement endorsement = endorsementRepository
                 .findByInstitutionProfileIdAndRecruiterProfileId(institution.getId(), recruiterId)
-                .orElseThrow(() -> new RuntimeException("La empresa no cuenta con tu insignia."));
+                .filter(e -> e.getRevokedAt() == null)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "La empresa no cuenta con tu insignia."));
 
-        endorsementRepository.delete(endorsement);
+        endorsement.setRevokedAt(LocalDateTime.now());
+        endorsement.setRevocationReason(reason);
+        endorsementRepository.save(endorsement);
+
+        RecruiterProfile recruiter = endorsement.getRecruiterProfile();
+        recalculateAccreditation(recruiter);
+
+        String notifTitle = "Insignia de Empresa Aliada retirada";
+        String notifContent = "Una institución educativa ha retirado su sello de confianza de tu perfil.";
+        notificationService.createNotification(recruiter.getUser(), notifTitle, notifContent);
+
         return "Insignia retirada exitosamente.";
     }
 
-    // Listar Empresas Aliadas
+    // Listar Empresas Aliadas (solo acreditaciones activas)
     @Transactional(readOnly = true)
     public List<EndorsedCompanyResponseDTO> getEndorsedCompanies(String email) {
         User user = userRepository.findByEmail(email)
@@ -162,7 +200,7 @@ public class InstitutionService {
         InstitutionProfile institution = institutionRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new RuntimeException("Perfil de institución no encontrado"));
 
-        return endorsementRepository.findByInstitutionProfileId(institution.getId())
+        return endorsementRepository.findByInstitutionProfileIdAndRevokedAtIsNull(institution.getId())
                 .stream()
                 .map(e -> EndorsedCompanyResponseDTO.builder()
                         .recruiterId(e.getRecruiterProfile().getId())
@@ -267,7 +305,7 @@ public class InstitutionService {
         long verifiedStudents = postulantRepository.countByInstitutionProfileIdAndIsInstitutionVerifiedTrue(instId);
         long hiredStudents = postulantRepository.countHiredStudentsByInstitutionId(instId);
         long activeAgreements = agreementRepository.countByInstitutionProfileIdAndStatus(instId, AgreementStatus.APPROVED);
-        long endorsedCompanies = endorsementRepository.countByInstitutionProfileId(instId);
+        long endorsedCompanies = endorsementRepository.countByInstitutionProfileIdAndRevokedAtIsNull(instId);
         double rate = 0.0;
         if (verifiedStudents > 0) {
             rate = ((double) hiredStudents / verifiedStudents) * 100;
