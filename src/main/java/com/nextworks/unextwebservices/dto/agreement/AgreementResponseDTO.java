@@ -11,6 +11,7 @@ import java.util.UUID;
 @Builder
 public class AgreementResponseDTO {
     private UUID id;
+    private UUID jobApplicationId;
     private String title;
     private String companyName;
     private String studentName;
@@ -20,5 +21,6 @@ public class AgreementResponseDTO {
     private String documentUrl;
     private AgreementStatus status;
     private String observations;
+    private LocalDateTime reviewedAt;
     private LocalDateTime createdAt;
 }
