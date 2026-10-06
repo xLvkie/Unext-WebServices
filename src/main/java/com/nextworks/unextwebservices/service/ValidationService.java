@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -83,5 +84,24 @@ public class ValidationService {
                         .status(val.getStatus())
                         .build())
                 .toList();
+    }
+
+    @Transactional
+    public String linkInstitution(String email, UUID institutionId) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        PostulantProfile postulant = postulantRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new RuntimeException("Perfil de postulante no encontrado"));
+
+        InstitutionProfile institution = institutionRepository.findById(institutionId)
+                .orElseThrow(() -> new RuntimeException("Institución no encontrada"));
+
+        // Vinculamos al estudiante y lo marcamos como NO verificado
+        postulant.setInstitutionProfile(institution);
+        postulant.setIsInstitutionVerified(false);
+        postulantRepository.save(postulant);
+
+        return "Solicitud de vinculación enviada exitosamente a la institución.";
     }
 }

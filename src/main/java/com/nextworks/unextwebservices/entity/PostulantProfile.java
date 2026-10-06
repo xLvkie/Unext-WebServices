@@ -34,10 +34,6 @@ public class PostulantProfile {
     @Builder.Default
     private Boolean hasUniversityBase = false;
 
-    @ManyToOne
-    @JoinColumn(name = "institution_id")
-    private InstitutionProfile institution;
-
     @Column(name = "student_code", length = 50)
     private String studentCode;
 

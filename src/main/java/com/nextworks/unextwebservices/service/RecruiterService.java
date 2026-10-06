@@ -1,9 +1,6 @@
 package com.nextworks.unextwebservices.service;
 
-import com.nextworks.unextwebservices.dto.ApplicationResponseDTO;
-import com.nextworks.unextwebservices.dto.JobOfferRequestDTO;
-import com.nextworks.unextwebservices.dto.JobOfferResponseDTO;
-import com.nextworks.unextwebservices.dto.RecruiterDirectoryResponseDTO;
+import com.nextworks.unextwebservices.dto.*;
 import com.nextworks.unextwebservices.entity.*;
 import com.nextworks.unextwebservices.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -160,7 +157,7 @@ public class RecruiterService {
 
     // 3. Editar la vacante y notificar a los postulantes
     @Transactional
-    public JobOfferResponseDTO updateJobOffer(String email, UUID jobId, JobOfferRequestDTO request) {
+    public JobOfferResponseDTO updateJobOffer(String email, UUID jobId, JobOfferUpdateDTO request) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
         RecruiterProfile profile = recruiterRepository.findByUserId(user.getId())
@@ -174,14 +171,30 @@ public class RecruiterService {
         }
 
         // Actualizar datos
-        offer.setTitle(request.getTitle());
-        offer.setDescription(request.getDescription());
-        offer.setRequirements(request.getRequirements());
-        offer.setLocation(request.getLocation());
-        offer.setModality(request.getModality());
-        offer.setExperienceLevel(request.getExperienceLevel());
-        offer.setMinSalary(request.getMinSalary());
-        offer.setMaxSalary(request.getMaxSalary());
+        if (request.getTitle() != null && !request.getTitle().isBlank()) {
+            offer.setTitle(request.getTitle());
+        }
+        if (request.getDescription() != null && !request.getDescription().isBlank()) {
+            offer.setDescription(request.getDescription());
+        }
+        if (request.getRequirements() != null && !request.getRequirements().isBlank()) {
+            offer.setRequirements(request.getRequirements());
+        }
+        if (request.getLocation() != null) {
+            offer.setLocation(request.getLocation());
+        }
+        if (request.getModality() != null) {
+            offer.setModality(request.getModality());
+        }
+        if (request.getExperienceLevel() != null) {
+            offer.setExperienceLevel(request.getExperienceLevel());
+        }
+        if (request.getMinSalary() != null) {
+            offer.setMinSalary(request.getMinSalary());
+        }
+        if (request.getMaxSalary() != null) {
+            offer.setMaxSalary(request.getMaxSalary());
+        }
 
         jobOfferRepository.save(offer);
 

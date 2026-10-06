@@ -35,10 +35,6 @@ public class ChatService {
                     .orElseThrow(() -> new RuntimeException("Postulación no encontrada"));
         }
 
-        // ==========================================
-        // REGLAS DE NEGOCIO: RESTRICCIONES DE CHAT
-        // ==========================================
-
         String senderRole = sender.getRole().name();
         String receiverRole = receiver.getRole().name();
         // Validación al segmeto POSTULANTE
@@ -59,7 +55,6 @@ public class ChatService {
             }
         }
 
-        // Determinar el contexto del chat para guardarlo (puede ser GENERAL si no hay postulación)
         ChatContext context = (application != null) ? ChatContext.JOB_APPLICATION : ChatContext.GENERAL;
 
         Message message = Message.builder()
@@ -85,12 +80,24 @@ public class ChatService {
         return inboxMessages.stream().map(this::mapToDTO).toList();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<MessageResponseDTO> getChatHistory(String email, UUID receiverId) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-
         List<Message> history = messageRepository.findChatHistory(user.getId(), receiverId);
+
+        boolean hasUnreadMessages = false;
+
+        for (Message message : history) {
+            if (message.getReceiver().getId().equals(user.getId()) && !message.getIsRead()) {
+                message.setIsRead(true);
+                hasUnreadMessages = true;
+            }
+        }
+
+        if (hasUnreadMessages) {
+            messageRepository.saveAll(history);
+        }
 
         return history.stream().map(this::mapToDTO).toList();
     }

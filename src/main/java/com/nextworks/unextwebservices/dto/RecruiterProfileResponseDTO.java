@@ -10,6 +10,7 @@ import java.util.UUID;
 @Builder
 public class RecruiterProfileResponseDTO {
     private UUID id;
+    private UUID userId;
     private String companyName;
     private String ruc;
     private String industry;

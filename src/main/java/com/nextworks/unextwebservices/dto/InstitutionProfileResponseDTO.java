@@ -10,6 +10,7 @@ import java.util.UUID;
 @Builder
 public class InstitutionProfileResponseDTO {
     private UUID id;
+    private UUID userId;
     private String name;
     private String domain;
     private String logoUrl;

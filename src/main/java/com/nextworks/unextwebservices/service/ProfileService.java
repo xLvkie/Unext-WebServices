@@ -123,6 +123,7 @@ public class ProfileService {
 
         return PostulantProfileResponseDTO.builder()
                 .id(profile.getId())
+                .userId(profile.getUser().getId())
                 .firstName(profile.getFirstName())
                 .lastName(profile.getLastName())
                 .studentCode(profile.getStudentCode())
@@ -132,6 +133,8 @@ public class ProfileService {
                 .headline(profile.getHeadline())
                 .bio(profile.getBio())
                 .hasUniversityBase(profile.getHasUniversityBase())
+                .isInstitutionVerified(profile.getIsInstitutionVerified())
+                .institutionProfile(profile.getInstitutionProfile() != null ? profile.getInstitutionProfile().getId() : null)
                 .skills(skillsDTO)
                 .build();
     }
@@ -155,7 +158,7 @@ public class ProfileService {
     }
 
     /* ============================================
-    // Mostrar y editar datos del perfil postulante
+    // Mostrar y editar datos del perfil reclutador
     // ============================================ */
     public RecruiterProfileResponseDTO getMyRecruiterProfile(String email) {
         User user = userRepository.findByEmail(email)
@@ -166,6 +169,7 @@ public class ProfileService {
 
         return RecruiterProfileResponseDTO.builder()
                 .id(profile.getId())
+                .userId(profile.getUser().getId())
                 .companyName(profile.getCompanyName())
                 .ruc(profile.getRuc())
                 .industry(profile.getIndustry())
@@ -191,7 +195,7 @@ public class ProfileService {
     }
 
     /* ============================================
-    // Mostrar y editar datos del perfil postulante
+    // Mostrar y editar datos del perfil intitucion
     // ============================================ */
     public InstitutionProfileResponseDTO getMyInstitutionProfile(String email) {
         User user = userRepository.findByEmail(email)
@@ -202,6 +206,7 @@ public class ProfileService {
 
         return InstitutionProfileResponseDTO.builder()
                 .id(profile.getId())
+                .userId(profile.getUser().getId())
                 .name(profile.getName())
                 .domain(profile.getDomain())
                 .logoUrl(profile.getLogoUrl())

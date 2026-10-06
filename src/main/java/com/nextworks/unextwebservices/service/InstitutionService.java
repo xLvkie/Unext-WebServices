@@ -45,11 +45,12 @@ public class InstitutionService {
                 .toList();
     }
 
-    // Aprobar perfil de alumno y disparar gatillo
+    // Aprobar o desaprobar el perfil del alumno y disparar gatillo
     @Transactional
-    public String verifyStudentProfile(String email, UUID postulantId) {
+    public String updateStudentAssociation(String email, UUID postulantId, ValidationStatus status) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
         InstitutionProfile institution = institutionRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new RuntimeException("Perfil de institución no encontrado"));
 
@@ -61,14 +62,39 @@ public class InstitutionService {
             throw new RuntimeException("HTTP 403: Este estudiante no pertenece a tu institución.");
         }
 
-        postulant.setIsInstitutionVerified(true);
+        String notifTitle = "";
+        String notifContent = "";
+        String responseMessage = "";
+
+        switch (status) {
+            case APPROVED:
+                postulant.setIsInstitutionVerified(true);
+
+                notifTitle = "Perfil Académico Oficializado";
+                notifContent = "Tu casa de estudios ha verificado oficialmente tu perfil. Ahora destacarás ante los reclutadores.";
+                responseMessage = "El estudiante ha sido verificado exitosamente.";
+                break;
+
+            case REJECTED:
+                postulant.setIsInstitutionVerified(false);
+                postulant.setInstitutionProfile(null);
+
+                notifTitle = "Asociación Académica Rechazada";
+                notifContent = "La institución no ha podido verificar tus datos. Por favor, revisa tu información e intenta vincularte nuevamente.";
+                responseMessage = "La solicitud del estudiante ha sido rechazada.";
+                break;
+
+            default:
+                throw new RuntimeException("HTTP 400: Acción no permitida. El estado debe ser APPROVED o REJECTED.");
+        }
+
         postulantRepository.save(postulant);
 
-        String notifTitle = "Perfil Académico Oficializado";
-        String notifContent = "Tu casa de estudios ha verificado oficialmente tu perfil. Ahora destacarás ante los reclutadores.";
-        notificationService.createNotification(postulant.getUser(), notifTitle, notifContent);
+        if (!notifTitle.isEmpty()) {
+            notificationService.createNotification(postulant.getUser(), notifTitle, notifContent);
+        }
 
-        return "El estudiante ha sido verificado exitosamente.";
+        return responseMessage;
     }
 
     // Otorgar Insignia a una Empresa

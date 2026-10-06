@@ -1,9 +1,6 @@
 package com.nextworks.unextwebservices.controller;
 
-import com.nextworks.unextwebservices.dto.ApplicationResponseDTO;
-import com.nextworks.unextwebservices.dto.JobOfferRequestDTO;
-import com.nextworks.unextwebservices.dto.JobOfferResponseDTO;
-import com.nextworks.unextwebservices.dto.RecruiterDirectoryResponseDTO;
+import com.nextworks.unextwebservices.dto.*;
 import com.nextworks.unextwebservices.entity.ApplicationStatus;
 import com.nextworks.unextwebservices.entity.User;
 import com.nextworks.unextwebservices.service.RecruiterService;
@@ -99,12 +96,13 @@ public class RecruiterController {
     public ResponseEntity<JobOfferResponseDTO> updateJobOffer(
             Authentication authentication,
             @PathVariable UUID jobId,
-            @Valid @RequestBody JobOfferRequestDTO request) {
+            @Valid @RequestBody JobOfferUpdateDTO request) {
         User user = (User) authentication.getPrincipal();
+        assert user != null;
         return ResponseEntity.ok(recruiterService.updateJobOffer(user.getEmail(), jobId, request));
         /*
-        Actualiza las caracteristicas de una vacante con todos estos campos: title (!), description (!), requirements (!),
-        location, modality (!), experienceLevel (!), minSalary, maxSalary
+        Actualiza las caracteristicas de una vacante con todos estos campos: title, description, requirements,
+        location, modality, experienceLevel, minSalary, maxSalary
         Se quiere que el User use su token
          */
     }

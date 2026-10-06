@@ -9,6 +9,7 @@ import java.util.List;
 @Builder
 public class PostulantProfileResponseDTO {
     private UUID id;
+    private UUID userId;
     private String firstName;
     private String lastName;
     private String studentCode;
@@ -18,5 +19,7 @@ public class PostulantProfileResponseDTO {
     private String headline;
     private String bio;
     private Boolean hasUniversityBase;
+    private Boolean isInstitutionVerified;
+    private UUID institutionProfile;
     private List<StudentSkillResponseDTO> skills;
 }
