@@ -52,7 +52,7 @@ public class DashboardService {
             long verified = postulantRepository.countVerifiedByInstitutionAndCareer(instId, career);
             long hired = postulantRepository.countHiredByInstitutionAndCareer(instId, career, ApplicationStatus.ACCEPTED);
             long activeAgreements = agreementRepository.countByInstitutionAndStatusAndCareer(instId, AgreementStatus.APPROVED, career);
-            long endorsed = endorsementRepository.countByInstitutionProfileId(instId);
+            long endorsed = endorsementRepository.countByInstitutionProfileIdAndRevokedAtIsNull(instId);
             double rate = verified > 0 ? Math.round(((double) hired / verified) * 10000.0) / 100.0 : 0.0;
 
             return DashboardSummaryResponseDTO.builder()

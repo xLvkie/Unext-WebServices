@@ -123,4 +123,15 @@ class DashboardServiceTest {
         assertThat(result.getTotalVerifiedStudents()).isZero();
         assertThat(result.getCareer()).isEqualTo("MeDiCiNa");
     }
+
+    @Test
+    void summaryCuentaSoloInsigniasActivasNoLasRevocadas() {
+        when(endorsementRepository.countByInstitutionProfileIdAndRevokedAtIsNull(instId)).thenReturn(1L);
+
+        var result = dashboardService.getSummary(EMAIL, null);
+
+        assertThat(result.getTotalEndorsedCompanies()).isEqualTo(1L);
+        verify(endorsementRepository).countByInstitutionProfileIdAndRevokedAtIsNull(instId);
+        verify(endorsementRepository, never()).countByInstitutionProfileId(any());
+    }
 }
