@@ -45,7 +45,15 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         // Rutas públicas (Login, Registro y Swagger)
-                        .requestMatchers("/api/auth/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                        .requestMatchers(
+                                "/api/auth/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/v3/api-docs/**",
+                                "/v3/api-docs",
+                                "/swagger-resources/**",
+                                "/webjars/**"
+                        ).permitAll()
                         // /error: JwtAuthenticationFilter (OncePerRequestFilter) no corre en el forward de error,
                         // asi que sin este permitAll cualquier ResponseStatusException (400/404/409) queda
                         // tapada por un 403 vacio del AuthenticationEntryPoint por defecto.

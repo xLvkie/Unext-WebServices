@@ -3,6 +3,7 @@ package com.nextworks.unextwebservices.controller;
 import com.nextworks.unextwebservices.dto.notification.NotificationResponseDTO;
 import com.nextworks.unextwebservices.entity.User;
 import com.nextworks.unextwebservices.service.NotificationService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.UUID;
 
+@Tag(name = "10. Notificaciones", description = "Gestión y lectura de alertas del sistema")
 @RestController
 @RequestMapping("/api/notifications")
 @RequiredArgsConstructor
