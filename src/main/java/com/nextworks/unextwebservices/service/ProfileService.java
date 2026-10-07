@@ -348,4 +348,37 @@ public class ProfileService {
                 .build()
         ).toList();
     }
+
+    // PERFIL ESPECIFICO DE UN POSTULANTE
+    @Transactional(readOnly = true)
+    public PostulantProfileResponseDTO getPostulantProfileById(UUID postulantId) {
+        PostulantProfile profile = postulantRepository.findById(postulantId)
+                .orElseThrow(() -> new RuntimeException("HTTP 404: Perfil de postulante no encontrado"));
+        
+        List<StudentSkill> skills = studentSkillRepository.findByPostulantProfileId(profile.getId());
+        List<StudentSkillResponseDTO> skillsDTO = skills.stream()
+                .map(skill -> StudentSkillResponseDTO.builder()
+                        .id(skill.getId())
+                        .name(skill.getName())
+                        .masteryLevel(skill.getMasteryLevel())
+                        .build())
+                .toList();
+
+        return PostulantProfileResponseDTO.builder()
+                .id(profile.getId())
+                .userId(profile.getUser().getId())
+                .firstName(profile.getFirstName())
+                .lastName(profile.getLastName())
+                .studentCode(profile.getStudentCode())
+                .career(profile.getCareer())
+                .currentCycle(profile.getCurrentCycle())
+                .cvUrl(profile.getCvUrl())
+                .headline(profile.getHeadline())
+                .bio(profile.getBio())
+                .hasUniversityBase(profile.getHasUniversityBase())
+                .isInstitutionVerified(profile.getIsInstitutionVerified())
+                .institutionProfile(profile.getInstitutionProfile() != null ? profile.getInstitutionProfile().getId() : null)
+                .skills(skillsDTO)
+                .build();
+    }
 }

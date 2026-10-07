@@ -210,7 +210,7 @@ public class ProfileController {
         profileService.deleteSkill(user.getEmail(), skillId);
         return ResponseEntity.noContent().build();
         /*
-        Elimina un habilidad mediante el <ID DE LA HABILIDAD>
+        Elimina una habilidad mediante el <ID DE LA HABILIDAD>
         Se debe hacer uso del bearer token del usuario
          */
     }
@@ -224,6 +224,15 @@ public class ProfileController {
         return ResponseEntity.ok(profileService.getAllPostulants());
         /*
         Devuelve el directorio público de todos los estudiantes de la plataforma.
+        */
+    }
+
+    @PreAuthorize("hasAnyAuthority('RECRUITER', 'INSTITUTION', 'POSTULANT')")
+    @GetMapping("/postulants/directory/{postulantId}")
+    public ResponseEntity<PostulantProfileResponseDTO> getPostulantById(@PathVariable UUID postulantId) {
+        return ResponseEntity.ok(profileService.getPostulantProfileById(postulantId));
+        /*
+        Devuelve el perfil detallado de un estudiante específico (Vista de "Ver Perfil").
         */
     }
 }
