@@ -15,6 +15,8 @@ import java.util.UUID;
 @Repository
 public interface PostulantProfileRepository extends JpaRepository<PostulantProfile, UUID> {
     Optional<PostulantProfile> findByUserId(UUID userId);
+    Optional<PostulantProfile> findByIdAndIsVerifiedTrue(UUID id);
+    List<PostulantProfile> findByIsVerifiedTrue();
     List<PostulantProfile> findByInstitutionProfileIdAndIsInstitutionVerifiedFalse(UUID institutionId);
     long countByInstitutionProfileIdAndIsInstitutionVerifiedTrue(UUID institutionId);
     long countByInstitutionProfileIdAndCareerIgnoreCase(UUID institutionId, String career);

@@ -71,6 +71,20 @@ public class ProfileController {
          */
     }
 
+    /* ==========================================
+    VERIFICACIÓN DE ORGANIZACIONES (RUC / DOMINIO)
+    // ========================================== */
+    @PreAuthorize("hasAnyAuthority('RECRUITER', 'INSTITUTION')")
+    @PostMapping("/organization/verify")
+    public ResponseEntity<String> verifyOrganization(
+            Authentication authentication,
+            @Valid @RequestBody OrganizationVerifyRequestDTO request) {
+
+        User user = (User) authentication.getPrincipal();
+        assert user != null;
+        return ResponseEntity.ok(profileService.verifyOrganization(user.getEmail(), request.getCode()));
+    }
+
     /* ========================
     ACTUALIZAR Y OBTENER PERFIL
     // ======================== */
@@ -233,6 +247,24 @@ public class ProfileController {
         return ResponseEntity.ok(profileService.getPostulantProfileById(postulantId));
         /*
         Devuelve el perfil detallado de un estudiante específico (Vista de "Ver Perfil").
+        */
+    }
+
+    @PreAuthorize("hasAnyAuthority('RECRUITER', 'INSTITUTION', 'POSTULANT')")
+    @GetMapping("/recruiters/directory/{recruiterId}")
+    public ResponseEntity<RecruiterProfileResponseDTO> getRecruiterById(@PathVariable UUID recruiterId) {
+        return ResponseEntity.ok(profileService.getRecruiterProfileById(recruiterId));
+        /*
+        Devuelve el perfil detallado de un reclutador específico (Vista de "Ver Perfil").
+        */
+    }
+
+    @PreAuthorize("hasAnyAuthority('RECRUITER', 'INSTITUTION', 'POSTULANT')")
+    @GetMapping("/institutions/directory/{institutionId}")
+    public ResponseEntity<InstitutionProfileResponseDTO> getInstitutionById(@PathVariable UUID institutionId) {
+        return ResponseEntity.ok(profileService.getInstitutionProfileById(institutionId));
+        /*
+        Devuelve el perfil detallado de una institución específico (Vista de "Ver Perfil").
         */
     }
 }

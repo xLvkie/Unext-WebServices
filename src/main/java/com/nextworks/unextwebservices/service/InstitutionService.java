@@ -340,7 +340,7 @@ public class InstitutionService {
     // Directorio público de instituciones para el frontend
     @Transactional(readOnly = true)
     public List<InstitutionDirectoryResponseDTO> getAllInstitutions() {
-        return institutionRepository.findAll().stream()
+        return institutionRepository.findByIsVerifiedTrue().stream()
                 .map(inst -> InstitutionDirectoryResponseDTO.builder()
                         .id(inst.getId())
                         .name(inst.getName())

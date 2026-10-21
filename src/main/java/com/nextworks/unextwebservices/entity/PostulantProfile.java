@@ -65,4 +65,8 @@ public class PostulantProfile {
 
     @Column(name = "is_institution_verified")
     private Boolean isInstitutionVerified;
+
+    @Column(name = "is_verified")
+    @Builder.Default
+    private Boolean isVerified = false;
 }

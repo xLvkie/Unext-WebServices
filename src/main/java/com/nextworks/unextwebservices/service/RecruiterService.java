@@ -47,6 +47,10 @@ public class RecruiterService {
         RecruiterProfile profile = recruiterRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new RuntimeException("Perfil de reclutador no encontrado"));
 
+        if (!Boolean.TRUE.equals(profile.getIsVerified())) {
+            throw new RuntimeException("HTTP 403: Debes verificar tu cuenta corporativa antes de realizar esta acción");
+        }
+
         JobOffer offer = JobOffer.builder()
                 .recruiterProfile(profile)
                 .title(request.getTitle())
@@ -326,7 +330,7 @@ public class RecruiterService {
     // LISTADO DE TODAS LAS EMPRESAS
     @Transactional(readOnly = true)
     public List<RecruiterDirectoryResponseDTO> getAllRecruiters() {
-        return recruiterRepository.findAll().stream()
+        return recruiterRepository.findByIsVerifiedTrue().stream()
                 .map(r -> RecruiterDirectoryResponseDTO.builder()
                         .id(r.getId())
                         .userId(r.getUser().getId())
@@ -345,6 +349,10 @@ public class RecruiterService {
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
         RecruiterProfile recruiter = recruiterRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new RuntimeException("Perfil de reclutador no encontrado"));
+
+        if (!Boolean.TRUE.equals(recruiter.getIsVerified())) {
+            throw new RuntimeException("HTTP 403: Debes verificar tu cuenta corporativa antes de realizar esta acción");
+        }
 
         // Identificar al Alumno
         PostulantProfile postulant = postulantRepository.findById(request.getPostulantId())

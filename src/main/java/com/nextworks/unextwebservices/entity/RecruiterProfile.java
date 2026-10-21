@@ -47,6 +47,13 @@ public class RecruiterProfile {
     @Builder.Default
     private Integer validationsCount = 0;
 
+    @Column(name = "is_verified")
+    @Builder.Default
+    private Boolean isVerified = false;
+
+    @Column(name = "verification_code", length = 10)
+    private String verificationCode;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

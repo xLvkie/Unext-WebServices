@@ -42,14 +42,16 @@ public class ProfileService {
                 .career(request.getCareer())
                 .currentCycle(request.getCurrentCycle())
                 .hasUniversityBase(true)
+                .isVerified(true) // Postulante queda verificado y visible al completar su perfil
                 .build();
 
         postulantRepository.save(profile);
 
         user.setIsProfileCompleted(true);
+        user.setIsEmailVerified(true);
         userRepository.save(user);
 
-        return "Perfil de postulante creado exitosamente";
+        return "Perfil de postulante creado y activado exitosamente";
     }
 
     @Transactional
@@ -61,6 +63,18 @@ public class ProfileService {
             throw new RuntimeException("El perfil ya está completado");
         }
 
+        // Validación de formato RUC (11 dígitos, empieza con 10 o 20)
+        if (request.getRuc() == null || !request.getRuc().matches("^(10|20)\\d{9}$")) {
+            throw new RuntimeException("HTTP 400: El RUC debe tener 11 dígitos válidos y comenzar con 10 o 20.");
+        }
+
+        if (recruiterRepository.existsByRuc(request.getRuc())) {
+            throw new RuntimeException("HTTP 409: Ya existe una empresa registrada con este RUC.");
+        }
+
+        // Generamos código OTP de 6 dígitos para verificación corporativa
+        String otpCode = String.format("%06d", new java.util.Random().nextInt(999999));
+
         RecruiterProfile profile = RecruiterProfile.builder()
                 .user(user)
                 .companyName(request.getCompanyName())
@@ -68,6 +82,8 @@ public class ProfileService {
                 .industry(request.getIndustry())
                 .description(request.getDescription())
                 .isValidated(false)
+                .isVerified(false) // Permanece oculto hasta verificar el código
+                .verificationCode(otpCode)
                 .build();
 
         recruiterRepository.save(profile);
@@ -75,7 +91,7 @@ public class ProfileService {
         user.setIsProfileCompleted(true);
         userRepository.save(user);
 
-        return "Perfil de reclutador creado exitosamente";
+        return "Perfil de reclutador creado. Cuenta pendiente de verificación corporativa. Código de prueba: " + otpCode;
     }
 
     @Transactional
@@ -87,10 +103,20 @@ public class ProfileService {
             throw new RuntimeException("El perfil ya está completado");
         }
 
+        String cleanDomain = request.getDomain().trim().toLowerCase();
+        if (institutionRepository.existsByDomain(cleanDomain)) {
+            throw new RuntimeException("HTTP 409: Este dominio institucional ya está registrado.");
+        }
+
+        // Generamos código OTP de 6 dígitos para verificación institucional
+        String otpCode = String.format("%06d", new java.util.Random().nextInt(999999));
+
         InstitutionProfile profile = InstitutionProfile.builder()
                 .user(user)
                 .name(request.getInstitutionName())
-                .domain(request.getDomain())
+                .domain(cleanDomain)
+                .isVerified(false) // Permanece oculto hasta verificar el código
+                .verificationCode(otpCode)
                 .build();
 
         institutionRepository.save(profile);
@@ -98,7 +124,58 @@ public class ProfileService {
         user.setIsProfileCompleted(true);
         userRepository.save(user);
 
-        return "Perfil de institución creado exitosamente";
+        return "Perfil de institución creado. Cuenta pendiente de verificación. Código de prueba: " + otpCode;
+    }
+
+    /* =======================================================
+    // Verificación de Organizaciones (Reclutador / Institución)
+    // ======================================================= */
+    @Transactional
+    public String verifyOrganization(String email, String code) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        String role = user.getRole().name();
+
+        if (role.equals("RECRUITER")) {
+            RecruiterProfile profile = recruiterRepository.findByUserId(user.getId())
+                    .orElseThrow(() -> new RuntimeException("Primero debes completar los datos de tu perfil de empresa"));
+
+            if (Boolean.TRUE.equals(profile.getIsVerified())) {
+                return "Tu cuenta corporativa ya se encuentra verificada";
+            }
+
+            if (profile.getVerificationCode() == null || !profile.getVerificationCode().equals(code.trim())) {
+                throw new RuntimeException("HTTP 400: Código de verificación corporativo incorrecto");
+            }
+
+            profile.setIsVerified(true);
+            profile.setVerificationCode(null);
+            recruiterRepository.save(profile);
+
+        } else if (role.equals("INSTITUTION")) {
+            InstitutionProfile profile = institutionRepository.findByUserId(user.getId())
+                    .orElseThrow(() -> new RuntimeException("Primero debes completar los datos de tu perfil institucional"));
+
+            if (Boolean.TRUE.equals(profile.getIsVerified())) {
+                return "Tu cuenta institucional ya se encuentra verificada";
+            }
+
+            if (profile.getVerificationCode() == null || !profile.getVerificationCode().equals(code.trim())) {
+                throw new RuntimeException("HTTP 400: Código de verificación institucional incorrecto");
+            }
+
+            profile.setIsVerified(true);
+            profile.setVerificationCode(null);
+            institutionRepository.save(profile);
+        } else {
+            throw new RuntimeException("HTTP 403: Rol no aplicable para verificación organizacional");
+        }
+
+        user.setIsEmailVerified(true);
+        userRepository.save(user);
+
+        return "Organización verificada exitosamente. Tu perfil ahora es visible públicamente.";
     }
 
     /* ============================================
@@ -112,8 +189,8 @@ public class ProfileService {
         PostulantProfile profile = postulantRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new RuntimeException("Perfil de postulante no encontrado"));
 
-        List<StudentSkill> skills = studentSkillRepository.findByPostulantProfileId(profile.getId());
-        List<StudentSkillResponseDTO> skillsDTO = skills.stream()
+        List<StudentSkill> mySkills = studentSkillRepository.findByPostulantProfileId(profile.getId());
+        List<StudentSkillResponseDTO> mySkillsDTO = mySkills.stream()
                 .map(skill -> StudentSkillResponseDTO.builder()
                         .id(skill.getId())
                         .name(skill.getName())
@@ -135,7 +212,7 @@ public class ProfileService {
                 .hasUniversityBase(profile.getHasUniversityBase())
                 .isInstitutionVerified(profile.getIsInstitutionVerified())
                 .institutionProfile(profile.getInstitutionProfile() != null ? profile.getInstitutionProfile().getId() : null)
-                .skills(skillsDTO)
+                .skills(mySkillsDTO)
                 .build();
     }
 
@@ -333,10 +410,10 @@ public class ProfileService {
         studentSkillRepository.delete(skill);
     }
 
-    // LISTADO DE TODOS LOS POSTULANTES
+    // LISTADO DE TODOS LOS POSTULANTES (Solo perfiles verificados/completados)
     @Transactional(readOnly = true)
     public List<PostulantDirectoryResponseDTO> getAllPostulants() {
-        List<PostulantProfile> postulants = postulantRepository.findAll();
+        List<PostulantProfile> postulants = postulantRepository.findByIsVerifiedTrue();
 
         return postulants.stream().map(profile -> PostulantDirectoryResponseDTO.builder()
                 .id(profile.getId())
@@ -349,18 +426,19 @@ public class ProfileService {
         ).toList();
     }
 
-    // PERFIL ESPECIFICO DE UN POSTULANTE
+    // PERFIL ESPECIFICO DE UN POSTULANTE (Solo si está verificado)
     @Transactional(readOnly = true)
     public PostulantProfileResponseDTO getPostulantProfileById(UUID postulantId) {
-        PostulantProfile profile = postulantRepository.findById(postulantId)
-                .orElseThrow(() -> new RuntimeException("HTTP 404: Perfil de postulante no encontrado"));
-        
+        PostulantProfile profile = postulantRepository.findByIdAndIsVerifiedTrue(postulantId)
+                .orElseThrow(() -> new RuntimeException("HTTP 404: Perfil de postulante no encontrado o no verificado"));
+
         List<StudentSkill> skills = studentSkillRepository.findByPostulantProfileId(profile.getId());
         List<StudentSkillResponseDTO> skillsDTO = skills.stream()
                 .map(skill -> StudentSkillResponseDTO.builder()
                         .id(skill.getId())
                         .name(skill.getName())
                         .masteryLevel(skill.getMasteryLevel())
+                        .isValidatedByInstitution(skill.getIsValidatedByInstitution())
                         .build())
                 .toList();
 
@@ -379,6 +457,39 @@ public class ProfileService {
                 .isInstitutionVerified(profile.getIsInstitutionVerified())
                 .institutionProfile(profile.getInstitutionProfile() != null ? profile.getInstitutionProfile().getId() : null)
                 .skills(skillsDTO)
+                .build();
+    }
+
+    // PERFIL ESPECIFICO DE UN RECLUTADOR / EMPRESA (Solo si está verificado corporativamente)
+    @Transactional(readOnly = true)
+    public RecruiterProfileResponseDTO getRecruiterProfileById(UUID recruiterId) {
+        RecruiterProfile profile = recruiterRepository.findByIdAndIsVerifiedTrue(recruiterId)
+                .orElseThrow(() -> new RuntimeException("HTTP 404: Perfil de empresa no encontrado o pendiente de verificación"));
+
+        return RecruiterProfileResponseDTO.builder()
+                .id(profile.getId())
+                .userId(profile.getUser().getId())
+                .companyName(profile.getCompanyName())
+                .ruc(profile.getRuc())
+                .industry(profile.getIndustry())
+                .description(profile.getDescription())
+                .isValidated(profile.getIsValidated())
+                .build();
+    }
+
+    // PERFIL ESPECIFICO DE UNA INSTITUCION (Solo si está verificada institucionalmente)
+    @Transactional(readOnly = true)
+    public InstitutionProfileResponseDTO getInstitutionProfileById(UUID institutionId) {
+        InstitutionProfile profile = institutionRepository.findByIdAndIsVerifiedTrue(institutionId)
+                .orElseThrow(() -> new RuntimeException("HTTP 404: Perfil de institución no encontrado o pendiente de verificación"));
+
+        return InstitutionProfileResponseDTO.builder()
+                .id(profile.getId())
+                .userId(profile.getUser().getId())
+                .name(profile.getName())
+                .domain(profile.getDomain())
+                .logoUrl(profile.getLogoUrl())
+                .description(profile.getDescription())
                 .build();
     }
 }
