@@ -15,6 +15,10 @@ public class PostulantProfileResponseDTO {
     private String studentCode;
     private String career;
     private Integer currentCycle;
+    private String institutionalEmail;
+    private String academicStatus;
+    private String academicEvidenceUrl;
+    private String academicEvidenceName;
     private String avatarUrl;
     private String bannerUrl;
     private String bannerText;
@@ -27,5 +31,6 @@ public class PostulantProfileResponseDTO {
     private Boolean isInstitutionVerified;
     private UUID institutionProfile;
     private String institutionName;
+    private String institutionLogoUrl;
     private List<StudentSkillResponseDTO> skills;
 }

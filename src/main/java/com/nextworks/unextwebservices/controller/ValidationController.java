@@ -1,5 +1,6 @@
 package com.nextworks.unextwebservices.controller;
 
+import com.nextworks.unextwebservices.dto.validation.AcademicVerificationRequestDTO;
 import com.nextworks.unextwebservices.dto.validation.ValidationRequestDTO;
 import com.nextworks.unextwebservices.dto.validation.ValidationResponseDTO;
 import com.nextworks.unextwebservices.entity.User;
@@ -28,16 +29,9 @@ public class ValidationController {
     public ResponseEntity<ValidationResponseDTO> requestValidation(
             Authentication authentication,
             @Valid @RequestBody ValidationRequestDTO request) {
-
         User user = (User) authentication.getPrincipal();
         assert user != null;
         return ResponseEntity.ok(validationService.requestValidation(user.getEmail(), request));
-        /*
-        Para completar una solicitud de revision de habilidades se requiere completar los campos:
-        institutionProfileId(!), technicalSkillId(!) y evidenceUrl(!)
-
-        # institutionProfileId no es el userId si no id (PK)
-         */
     }
 
     @PreAuthorize("hasAuthority('POSTULANT')")
@@ -46,10 +40,16 @@ public class ValidationController {
         User user = (User) authentication.getPrincipal();
         assert user != null;
         return ResponseEntity.ok(validationService.getMyValidations(user.getEmail()));
-        /*
-        Retorna una lista de todas las validacioes
-        Se requiere uso del bearer mediante el token del usuario
-         */
+    }
+
+    @PreAuthorize("hasAuthority('POSTULANT')")
+    @PostMapping("/me/academic-verification")
+    public ResponseEntity<String> requestAcademicVerification(
+            Authentication authentication,
+            @Valid @RequestBody AcademicVerificationRequestDTO request) {
+        User user = (User) authentication.getPrincipal();
+        assert user != null;
+        return ResponseEntity.ok(validationService.requestAcademicVerification(user.getEmail(), request));
     }
 
     @PreAuthorize("hasAuthority('POSTULANT')")
@@ -57,13 +57,8 @@ public class ValidationController {
     public ResponseEntity<String> linkInstitution(
             Authentication authentication,
             @PathVariable UUID institutionId) {
-
         User user = (User) authentication.getPrincipal();
         assert user != null;
         return ResponseEntity.ok(validationService.linkInstitution(user.getEmail(), institutionId));
-        /*
-        Envía a revisión el estado de su asociación con la institución deseada.
-        El user requiere uso del token.
-         */
     }
 }

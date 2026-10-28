@@ -1,5 +1,6 @@
 package com.nextworks.unextwebservices.controller;
 
+import com.nextworks.unextwebservices.dto.directory.InstitutionDirectoryResponseDTO;
 import com.nextworks.unextwebservices.dto.directory.PostulantDirectoryResponseDTO;
 import com.nextworks.unextwebservices.dto.profile.*;
 import com.nextworks.unextwebservices.entity.User;
@@ -229,6 +230,9 @@ public class ProfileController {
          */
     }
 
+    /* ===========================
+    LISTADO O BUSQUEDA DE SEGMENTO
+    // =========================== */
     @PreAuthorize("hasAnyAuthority('RECRUITER', 'INSTITUTION', 'POSTULANT')")
     @GetMapping("/postulants/directory")
     public ResponseEntity<List<PostulantDirectoryResponseDTO>> getAllPostulants(Authentication authentication) {
@@ -257,6 +261,12 @@ public class ProfileController {
         /*
         Devuelve el perfil detallado de un reclutador específico (Vista de "Ver Perfil").
         */
+    }
+
+    @PreAuthorize("hasAnyAuthority('RECRUITER', 'INSTITUTION', 'POSTULANT')")
+    @GetMapping("/institution/directory")
+    public ResponseEntity<List<InstitutionDirectoryResponseDTO>> getAllInstitutions() {
+        return ResponseEntity.ok(profileService.getAllInstitutions());
     }
 
     @PreAuthorize("hasAnyAuthority('RECRUITER', 'INSTITUTION', 'POSTULANT')")

@@ -9,7 +9,9 @@ import java.util.UUID;
 @Builder
 public class ValidationResponseDTO {
     private UUID id;
+    private UUID technicalSkillId;
     private String institutionName;
+    private String institutionLogoUrl;
     private String technicalSkillName;
     private String evidenceUrl;
     private ValidationStatus status;

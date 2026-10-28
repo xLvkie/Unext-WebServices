@@ -7,4 +7,5 @@ import lombok.Data;
 public class StudentSkillUpdateDTO {
     private String name;
     private String masteryLevel;
+    private Boolean isTopSkill;
 }

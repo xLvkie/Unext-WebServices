@@ -1,5 +1,6 @@
 package com.nextworks.unextwebservices.service;
 
+import com.nextworks.unextwebservices.dto.directory.InstitutionDirectoryResponseDTO;
 import com.nextworks.unextwebservices.dto.directory.PostulantDirectoryResponseDTO;
 import com.nextworks.unextwebservices.dto.profile.*;
 import com.nextworks.unextwebservices.entity.*;
@@ -206,7 +207,10 @@ public class ProfileService {
                         .id(skill.getId())
                         .name(skill.getName())
                         .masteryLevel(skill.getMasteryLevel())
+                        .isTopSkill(Boolean.TRUE.equals(skill.getIsTopSkill()))
                         .isValidatedByInstitution(Boolean.TRUE.equals(skill.getIsValidatedByInstitution()))
+                        .validatedInstitutionName(skill.getValidatedInstitutionName())
+                        .validatedInstitutionLogoUrl(skill.getValidatedInstitutionLogoUrl())
                         .build())
                 .toList();
 
@@ -218,7 +222,10 @@ public class ProfileService {
                 .studentCode(profile.getStudentCode())
                 .career(profile.getCareer())
                 .currentCycle(profile.getCurrentCycle())
-                .cvUrl(profile.getCvUrl())
+                .institutionalEmail(profile.getInstitutionalEmail())
+                .academicStatus(profile.getAcademicStatus())
+                .academicEvidenceUrl(profile.getAcademicEvidenceUrl())
+                .academicEvidenceName(profile.getAcademicEvidenceName())
                 .avatarUrl(profile.getAvatarUrl())
                 .bannerUrl(profile.getBannerUrl())
                 .bannerText(profile.getBannerText())
@@ -231,6 +238,7 @@ public class ProfileService {
                 .isInstitutionVerified(Boolean.TRUE.equals(profile.getIsInstitutionVerified()))
                 .institutionProfile(profile.getInstitutionProfile() != null ? profile.getInstitutionProfile().getId() : null)
                 .institutionName(profile.getInstitutionProfile() != null ? profile.getInstitutionProfile().getName() : null)
+                .institutionLogoUrl(profile.getInstitutionProfile() != null ? profile.getInstitutionProfile().getLogoUrl() : null)
                 .skills(mySkillsDTO)
                 .build();
     }
@@ -354,10 +362,19 @@ public class ProfileService {
             throw new RuntimeException("Ya tienes una habilidad técnica registrada con el nombre: " + request.getName());
         }
 
+        boolean wantsTopSkill = Boolean.TRUE.equals(request.getIsTopSkill());
+        if (wantsTopSkill) {
+            long currentTopCount = studentSkillRepository.countByPostulantProfileIdAndIsTopSkillTrue(profile.getId());
+            if (currentTopCount >= 3) {
+                throw new RuntimeException("HTTP 400: Solo puedes destacar un máximo de 3 aptitudes principales.");
+            }
+        }
+
         StudentSkill skill = StudentSkill.builder()
                 .postulantProfile(profile)
-                .name(request.getName())
+                .name(request.getName().trim())
                 .masteryLevel(request.getMasteryLevel())
+                .isTopSkill(wantsTopSkill)
                 .isValidatedByInstitution(false)
                 .build();
 
@@ -367,7 +384,10 @@ public class ProfileService {
                 .id(skill.getId())
                 .name(skill.getName())
                 .masteryLevel(skill.getMasteryLevel())
-                .isValidatedByInstitution(skill.getIsValidatedByInstitution())
+                .isTopSkill(Boolean.TRUE.equals(skill.getIsTopSkill()))
+                .isValidatedByInstitution(Boolean.TRUE.equals(skill.getIsValidatedByInstitution()))
+                .validatedInstitutionName(skill.getValidatedInstitutionName())
+                .validatedInstitutionLogoUrl(skill.getValidatedInstitutionLogoUrl())
                 .build();
     }
 
@@ -387,12 +407,15 @@ public class ProfileService {
                         .id(skill.getId())
                         .name(skill.getName())
                         .masteryLevel(skill.getMasteryLevel())
-                        .isValidatedByInstitution(skill.getIsValidatedByInstitution())
+                        .isTopSkill(Boolean.TRUE.equals(skill.getIsTopSkill()))
+                        .isValidatedByInstitution(Boolean.TRUE.equals(skill.getIsValidatedByInstitution()))
+                        .validatedInstitutionName(skill.getValidatedInstitutionName())
+                        .validatedInstitutionLogoUrl(skill.getValidatedInstitutionLogoUrl())
                         .build())
                 .toList();
     }
 
-    // ACTUALIZAR HABILIDAD TECNICA
+    // ACTUALIZAR HABILIDAD TECNICA (Incluye marcar/desmarcar como Principal Aptitud con tope de 3)
     @Transactional
     public StudentSkillResponseDTO updateSkill(String email, UUID skillId, StudentSkillUpdateDTO request) {
         User user = userRepository.findByEmail(email)
@@ -408,8 +431,25 @@ public class ProfileService {
             throw new RuntimeException("No tienes permiso para editar esta habilidad");
         }
 
-        if (request.getName() != null) skill.setName(request.getName());
-        if (request.getMasteryLevel() != null) skill.setMasteryLevel(request.getMasteryLevel());
+        if (request.getIsTopSkill() != null) {
+            boolean markingAsTop = Boolean.TRUE.equals(request.getIsTopSkill());
+            boolean wasAlreadyTop = Boolean.TRUE.equals(skill.getIsTopSkill());
+
+            if (markingAsTop && !wasAlreadyTop) {
+                long currentTopCount = studentSkillRepository.countByPostulantProfileIdAndIsTopSkillTrue(profile.getId());
+                if (currentTopCount >= 3) {
+                    throw new RuntimeException("HTTP 400: Ya tienes 3 aptitudes principales seleccionadas. Desmarca una primero.");
+                }
+            }
+            skill.setIsTopSkill(markingAsTop);
+        }
+
+        if (request.getName() != null && !request.getName().isBlank()) {
+            skill.setName(request.getName().trim());
+        }
+        if (request.getMasteryLevel() != null) {
+            skill.setMasteryLevel(request.getMasteryLevel());
+        }
 
         studentSkillRepository.save(skill);
 
@@ -417,7 +457,10 @@ public class ProfileService {
                 .id(skill.getId())
                 .name(skill.getName())
                 .masteryLevel(skill.getMasteryLevel())
-                .isValidatedByInstitution(skill.getIsValidatedByInstitution())
+                .isTopSkill(Boolean.TRUE.equals(skill.getIsTopSkill()))
+                .isValidatedByInstitution(Boolean.TRUE.equals(skill.getIsValidatedByInstitution()))
+                .validatedInstitutionName(skill.getValidatedInstitutionName())
+                .validatedInstitutionLogoUrl(skill.getValidatedInstitutionLogoUrl())
                 .build();
     }
 
@@ -441,6 +484,58 @@ public class ProfileService {
         studentSkillRepository.delete(skill);
     }
 
+    /* ================================
+        LISTADO O BUSQUEDA DE SEGMENTOS
+    // ================================= */
+
+    // PERFIL ESPECIFICO DE UN POSTULANTE (Solo si está verificado)
+    @Transactional(readOnly = true)
+    public PostulantProfileResponseDTO getPostulantProfileById(UUID postulantId) {
+        PostulantProfile profile = postulantRepository.findByIdAndIsVerifiedTrue(postulantId)
+                .orElseThrow(() -> new RuntimeException("HTTP 404: Perfil de postulante no encontrado o no verificado"));
+
+        List<StudentSkill> skills = studentSkillRepository.findByPostulantProfileId(profile.getId());
+        List<StudentSkillResponseDTO> skillsDTO = skills.stream()
+                .map(skill -> StudentSkillResponseDTO.builder()
+                        .id(skill.getId())
+                        .name(skill.getName())
+                        .masteryLevel(skill.getMasteryLevel())
+                        .isTopSkill(Boolean.TRUE.equals(skill.getIsTopSkill()))
+                        .isValidatedByInstitution(Boolean.TRUE.equals(skill.getIsValidatedByInstitution()))
+                        .validatedInstitutionName(skill.getValidatedInstitutionName())
+                        .validatedInstitutionLogoUrl(skill.getValidatedInstitutionLogoUrl())
+                        .build())
+                .toList();
+
+        return PostulantProfileResponseDTO.builder()
+                .id(profile.getId())
+                .userId(profile.getUser().getId())
+                .firstName(profile.getFirstName())
+                .lastName(profile.getLastName())
+                .studentCode(profile.getStudentCode())
+                .career(profile.getCareer())
+                .currentCycle(profile.getCurrentCycle())
+                .institutionalEmail(profile.getInstitutionalEmail())
+                .academicStatus(profile.getAcademicStatus())
+                .academicEvidenceUrl(profile.getAcademicEvidenceUrl())
+                .academicEvidenceName(profile.getAcademicEvidenceName())
+                .avatarUrl(profile.getAvatarUrl())
+                .bannerUrl(profile.getBannerUrl())
+                .bannerText(profile.getBannerText())
+                .cvUrl(profile.getCvUrl())
+                .cvFileName(profile.getCvFileName())
+                .cvFileSize(profile.getCvFileSize())
+                .headline(profile.getHeadline())
+                .bio(profile.getBio())
+                .hasUniversityBase(Boolean.TRUE.equals(profile.getHasUniversityBase()))
+                .isInstitutionVerified(Boolean.TRUE.equals(profile.getIsInstitutionVerified()))
+                .institutionProfile(profile.getInstitutionProfile() != null ? profile.getInstitutionProfile().getId() : null)
+                .institutionName(profile.getInstitutionProfile() != null ? profile.getInstitutionProfile().getName() : null)
+                .institutionLogoUrl(profile.getInstitutionProfile() != null ? profile.getInstitutionProfile().getLogoUrl() : null)
+                .skills(skillsDTO)
+                .build();
+    }
+
     // LISTADO DE TODOS LOS POSTULANTES (Solo perfiles verificados/completados)
     @Transactional(readOnly = true)
     public List<PostulantDirectoryResponseDTO> getAllPostulants() {
@@ -457,44 +552,35 @@ public class ProfileService {
         ).toList();
     }
 
-    // PERFIL ESPECIFICO DE UN POSTULANTE (Solo si está verificado)
+    // LISTADO DE TODOS LAS INSTITUCIONES
     @Transactional(readOnly = true)
-    public PostulantProfileResponseDTO getPostulantProfileById(UUID postulantId) {
-        PostulantProfile profile = postulantRepository.findByIdAndIsVerifiedTrue(postulantId)
-                .orElseThrow(() -> new RuntimeException("HTTP 404: Perfil de postulante no encontrado o no verificado"));
+    public List<InstitutionDirectoryResponseDTO> getAllInstitutions() {
+        List<InstitutionProfile> institutions = institutionRepository.findByIsVerifiedTrue();
 
-        List<StudentSkill> skills = studentSkillRepository.findByPostulantProfileId(profile.getId());
-        List<StudentSkillResponseDTO> skillsDTO = skills.stream()
-                .map(skill -> StudentSkillResponseDTO.builder()
-                        .id(skill.getId())
-                        .name(skill.getName())
-                        .masteryLevel(skill.getMasteryLevel())
-                        .isValidatedByInstitution(skill.getIsValidatedByInstitution())
-                        .build())
-                .toList();
-
-        return PostulantProfileResponseDTO.builder()
+        return institutions.stream().map(profile -> InstitutionDirectoryResponseDTO.builder()
                 .id(profile.getId())
                 .userId(profile.getUser().getId())
-                .firstName(profile.getFirstName())
-                .lastName(profile.getLastName())
-                .studentCode(profile.getStudentCode())
-                .career(profile.getCareer())
-                .currentCycle(profile.getCurrentCycle())
-                .cvUrl(profile.getCvUrl())
-                .avatarUrl(profile.getAvatarUrl())
-                .bannerUrl(profile.getBannerUrl())
-                .bannerText(profile.getBannerText())
-                .cvUrl(profile.getCvUrl())
-                .cvFileName(profile.getCvFileName())
-                .cvFileSize(profile.getCvFileSize())
-                .headline(profile.getHeadline())
-                .bio(profile.getBio())
-                .hasUniversityBase(profile.getHasUniversityBase())
-                .isInstitutionVerified(profile.getIsInstitutionVerified())
-                .institutionProfile(profile.getInstitutionProfile() != null ? profile.getInstitutionProfile().getId() : null)
-                .institutionName(profile.getInstitutionProfile() != null ? profile.getInstitutionProfile().getName() : null)
-                .skills(skillsDTO)
+                .name(profile.getName())
+                .domain(profile.getDomain())
+                .logoUrl(profile.getLogoUrl())
+                .description(profile.getDescription())
+                .build()
+        ).toList();
+    }
+
+    // PERFIL ESPECIFICO DE UNA INSTITUCION (Solo si está verificada institucionalmente)
+    @Transactional(readOnly = true)
+    public InstitutionProfileResponseDTO getInstitutionProfileById(UUID institutionId) {
+        InstitutionProfile profile = institutionRepository.findByIdAndIsVerifiedTrue(institutionId)
+                .orElseThrow(() -> new RuntimeException("HTTP 404: Perfil de institución no encontrado o pendiente de verificación"));
+
+        return InstitutionProfileResponseDTO.builder()
+                .id(profile.getId())
+                .userId(profile.getUser().getId())
+                .name(profile.getName())
+                .domain(profile.getDomain())
+                .logoUrl(profile.getLogoUrl())
+                .description(profile.getDescription())
                 .build();
     }
 
@@ -512,22 +598,6 @@ public class ProfileService {
                 .industry(profile.getIndustry())
                 .description(profile.getDescription())
                 .isValidated(profile.getIsValidated())
-                .build();
-    }
-
-    // PERFIL ESPECIFICO DE UNA INSTITUCION (Solo si está verificada institucionalmente)
-    @Transactional(readOnly = true)
-    public InstitutionProfileResponseDTO getInstitutionProfileById(UUID institutionId) {
-        InstitutionProfile profile = institutionRepository.findByIdAndIsVerifiedTrue(institutionId)
-                .orElseThrow(() -> new RuntimeException("HTTP 404: Perfil de institución no encontrado o pendiente de verificación"));
-
-        return InstitutionProfileResponseDTO.builder()
-                .id(profile.getId())
-                .userId(profile.getUser().getId())
-                .name(profile.getName())
-                .domain(profile.getDomain())
-                .logoUrl(profile.getLogoUrl())
-                .description(profile.getDescription())
                 .build();
     }
 }

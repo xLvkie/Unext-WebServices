@@ -3,7 +3,6 @@ package com.nextworks.unextwebservices.service;
 import com.nextworks.unextwebservices.dto.agreement.AgreementResponseDTO;
 import com.nextworks.unextwebservices.dto.agreement.AgreementUpdateRequestDTO;
 import com.nextworks.unextwebservices.dto.dashboard.DashboardStatsResponseDTO;
-import com.nextworks.unextwebservices.dto.directory.InstitutionDirectoryResponseDTO;
 import com.nextworks.unextwebservices.dto.validation.EndorsedCompanyResponseDTO;
 import com.nextworks.unextwebservices.dto.validation.PendingStudentResponseDTO;
 import com.nextworks.unextwebservices.dto.validation.PendingValidationResponseDTO;
@@ -335,17 +334,6 @@ public class InstitutionService {
         } catch (DataAccessException ex) {
             throw new RuntimeException(DASHBOARD_DB_ERROR);
         }
-    }
-
-    // Directorio público de instituciones para el frontend
-    @Transactional(readOnly = true)
-    public List<InstitutionDirectoryResponseDTO> getAllInstitutions() {
-        return institutionRepository.findByIsVerifiedTrue().stream()
-                .map(inst -> InstitutionDirectoryResponseDTO.builder()
-                        .id(inst.getId())
-                        .name(inst.getName())
-                        .build())
-                .toList();
     }
 
     // Listar validaciones de habilidades pendientes

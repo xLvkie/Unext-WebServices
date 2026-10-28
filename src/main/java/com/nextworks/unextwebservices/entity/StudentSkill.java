@@ -18,7 +18,6 @@ public class StudentSkill {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    // Relación: Muchas habilidades pertenecen a un solo perfil de postulante
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "postulant_profile_id", nullable = false)
     private PostulantProfile postulantProfile;
@@ -27,20 +26,31 @@ public class StudentSkill {
     private String name;
 
     @Column(name = "mastery_level", nullable = false, length = 50)
-    private String masteryLevel; // Ej: BASICO, INTERMEDIO, AVANZADO
+    private String masteryLevel; // BASICO, INTERMEDIO, AVANZADO
+
+    @Column(name = "is_top_skill")
+    private Boolean isTopSkill;
 
     @Column(name = "is_validated_by_institution")
     private Boolean isValidatedByInstitution;
 
+    @Column(name = "validated_institution_name", length = 150)
+    private String validatedInstitutionName;
+
+    @Column(name = "validated_institution_logo_url", columnDefinition = "TEXT")
+    private String validatedInstitutionLogoUrl;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
-    // Este método se ejecuta automáticamente justo antes de guardar en la base de datos
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
         if (this.isValidatedByInstitution == null) {
-            this.isValidatedByInstitution = false; // Por defecto nace sin validar
+            this.isValidatedByInstitution = false;
+        }
+        if (this.isTopSkill == null) {
+            this.isTopSkill = false;
         }
     }
 }

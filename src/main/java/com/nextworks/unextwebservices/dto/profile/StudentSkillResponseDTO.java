@@ -10,5 +10,8 @@ public class StudentSkillResponseDTO {
     private UUID id;
     private String name;
     private String masteryLevel;
+    private Boolean isTopSkill;
     private Boolean isValidatedByInstitution;
+    private String validatedInstitutionName;
+    private String validatedInstitutionLogoUrl;
 }

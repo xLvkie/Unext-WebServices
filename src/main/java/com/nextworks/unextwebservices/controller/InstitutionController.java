@@ -135,16 +135,6 @@ public class InstitutionController {
         return ResponseEntity.ok(institutionService.getDashboardStats(user.getEmail(), career));
     }
 
-    @PreAuthorize("hasAnyAuthority('POSTULANT', 'INSTITUTION', 'RECRUITER')")
-    @GetMapping("/directory")
-    public ResponseEntity<List<InstitutionDirectoryResponseDTO>> getAllInstitutions() {
-        return ResponseEntity.ok(institutionService.getAllInstitutions());
-        /*
-        Retorna un listado de todas las instituciones
-        El user requiere uso del token
-         */
-    }
-
     @PreAuthorize("hasAuthority('INSTITUTION')")
     @GetMapping("/validations/pending")
     public ResponseEntity<List<PendingValidationResponseDTO>> getPendingSkillValidations(Authentication authentication) {

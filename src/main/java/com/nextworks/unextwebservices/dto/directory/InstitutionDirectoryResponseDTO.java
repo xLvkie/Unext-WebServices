@@ -10,4 +10,7 @@ public class InstitutionDirectoryResponseDTO {
     private UUID id;
     private UUID userId;
     private String name;
+    private String domain;
+    private String logoUrl;
+    private String description;
 }

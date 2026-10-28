@@ -16,4 +16,5 @@ public interface StudentSkillRepository extends JpaRepository<StudentSkill, UUID
 
     @Query("SELECT DISTINCT s.name FROM StudentSkill s WHERE LOWER(s.name) LIKE LOWER(CONCAT('%', :query, '%')) ORDER BY s.name")
     List<String> suggestNames(@Param("query") String query);
+    long countByPostulantProfileIdAndIsTopSkillTrue(UUID postulantProfileId);
 }

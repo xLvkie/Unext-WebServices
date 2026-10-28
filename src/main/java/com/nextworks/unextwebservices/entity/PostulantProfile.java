@@ -30,22 +30,6 @@ public class PostulantProfile {
     @Column(name = "last_name", nullable = false, length = 100)
     private String lastName;
 
-    @Column(name = "has_university_base")
-    @Builder.Default
-    private Boolean hasUniversityBase = false;
-
-    @Column(name = "student_code", length = 50)
-    private String studentCode;
-
-    @Column(length = 150)
-    private String career;
-
-    @Column(name = "current_cycle")
-    private Integer currentCycle;
-
-    @Column(name = "cv_url", columnDefinition = "TEXT")
-    private String cvUrl;
-
     @Column(columnDefinition = "TEXT")
     private String bio;
 
@@ -74,6 +58,20 @@ public class PostulantProfile {
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
+    // Apartado academico
+    @Column(name = "has_university_base")
+    @Builder.Default
+    private Boolean hasUniversityBase = false;
+
+    @Column(name = "student_code", length = 50)
+    private String studentCode;
+
+    @Column(length = 150)
+    private String career;
+
+    @Column(name = "current_cycle")
+    private Integer currentCycle;
+
     @OneToMany(mappedBy = "postulantProfile", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<StudentSkill> skills;
 
@@ -87,4 +85,16 @@ public class PostulantProfile {
     @Column(name = "is_verified")
     @Builder.Default
     private Boolean isVerified = false;
+
+    @Column(name = "institutional_email", length = 150)
+    private String institutionalEmail;
+
+    @Column(name = "academic_status", length = 30)
+    private String academicStatus;
+
+    @Column(name = "academic_evidence_url", columnDefinition = "TEXT")
+    private String academicEvidenceUrl;
+
+    @Column(name = "academic_evidence_name", length = 255)
+    private String academicEvidenceName;
 }
