@@ -46,11 +46,29 @@ public class PostulantProfile {
     @Column(name = "cv_url", columnDefinition = "TEXT")
     private String cvUrl;
 
-    @Column(length = 255)
-    private String headline;
-
     @Column(columnDefinition = "TEXT")
     private String bio;
+
+    @Column(name = "avatar_url", columnDefinition = "TEXT")
+    private String avatarUrl;
+
+    @Column(name = "banner_url", columnDefinition = "TEXT")
+    private String bannerUrl;
+
+    @Column(name = "banner_text", length = 35)
+    private String bannerText;
+
+    @Column(name = "cv_url", columnDefinition = "TEXT")
+    private String cvUrl;
+
+    @Column(name = "cv_file_name", length = 255)
+    private String cvFileName;
+
+    @Column(name = "cv_file_size", length = 50)
+    private String cvFileSize;
+
+    @Column(length = 120)
+    private String headline;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

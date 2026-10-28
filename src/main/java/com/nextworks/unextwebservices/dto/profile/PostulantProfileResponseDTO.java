@@ -15,11 +15,17 @@ public class PostulantProfileResponseDTO {
     private String studentCode;
     private String career;
     private Integer currentCycle;
+    private String avatarUrl;
+    private String bannerUrl;
+    private String bannerText;
     private String cvUrl;
+    private String cvFileName;
+    private String cvFileSize;
     private String headline;
     private String bio;
     private Boolean hasUniversityBase;
     private Boolean isInstitutionVerified;
     private UUID institutionProfile;
+    private String institutionName;
     private List<StudentSkillResponseDTO> skills;
 }

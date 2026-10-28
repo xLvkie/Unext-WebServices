@@ -30,25 +30,36 @@ public class ProfileService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
-        if (user.getIsProfileCompleted()) {
+        if (Boolean.TRUE.equals(user.getIsProfileCompleted())) {
             throw new RuntimeException("El perfil ya está completado");
         }
 
         PostulantProfile profile = PostulantProfile.builder()
                 .user(user)
-                .firstName(request.getFirstName())
-                .lastName(request.getLastName())
+                .firstName(request.getFirstName().trim())
+                .lastName(request.getLastName().trim())
+                .headline(request.getHeadline())
+                .bio(request.getBio())
+                .cvUrl(request.getCvUrl())
+                .avatarUrl(request.getAvatarUrl())
+                .bannerUrl(request.getBannerUrl())
+                .bannerText(request.getBannerText())
+                .cvUrl(request.getCvUrl())
+                .cvFileName(request.getCvFileName())
+                .cvFileSize(request.getCvFileSize())
+                // Campos universitarios inician nulos/falsos hasta que solicite "Verificación Universitaria"
                 .studentCode(request.getStudentCode())
                 .career(request.getCareer())
                 .currentCycle(request.getCurrentCycle())
-                .hasUniversityBase(true)
-                .isVerified(true) // Postulante queda verificado y visible al completar su perfil
+                .hasUniversityBase(false)
+                .isInstitutionVerified(false)
+                .isVerified(true)
                 .build();
 
         postulantRepository.save(profile);
 
         user.setIsProfileCompleted(true);
-        user.setIsEmailVerified(true);
+        user.setIsEmailVerified(false);
         userRepository.save(user);
 
         return "Perfil de postulante creado y activado exitosamente";
@@ -187,7 +198,7 @@ public class ProfileService {
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
         PostulantProfile profile = postulantRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new RuntimeException("Perfil de postulante no encontrado"));
+                .orElseThrow(() -> new RuntimeException("HTTP 404: Perfil de postulante no encontrado"));
 
         List<StudentSkill> mySkills = studentSkillRepository.findByPostulantProfileId(profile.getId());
         List<StudentSkillResponseDTO> mySkillsDTO = mySkills.stream()
@@ -195,6 +206,7 @@ public class ProfileService {
                         .id(skill.getId())
                         .name(skill.getName())
                         .masteryLevel(skill.getMasteryLevel())
+                        .isValidatedByInstitution(Boolean.TRUE.equals(skill.getIsValidatedByInstitution()))
                         .build())
                 .toList();
 
@@ -207,11 +219,18 @@ public class ProfileService {
                 .career(profile.getCareer())
                 .currentCycle(profile.getCurrentCycle())
                 .cvUrl(profile.getCvUrl())
+                .avatarUrl(profile.getAvatarUrl())
+                .bannerUrl(profile.getBannerUrl())
+                .bannerText(profile.getBannerText())
+                .cvUrl(profile.getCvUrl())
+                .cvFileName(profile.getCvFileName())
+                .cvFileSize(profile.getCvFileSize())
                 .headline(profile.getHeadline())
                 .bio(profile.getBio())
-                .hasUniversityBase(profile.getHasUniversityBase())
-                .isInstitutionVerified(profile.getIsInstitutionVerified())
+                .hasUniversityBase(Boolean.TRUE.equals(profile.getHasUniversityBase()))
+                .isInstitutionVerified(Boolean.TRUE.equals(profile.getIsInstitutionVerified()))
                 .institutionProfile(profile.getInstitutionProfile() != null ? profile.getInstitutionProfile().getId() : null)
+                .institutionName(profile.getInstitutionProfile() != null ? profile.getInstitutionProfile().getName() : null)
                 .skills(mySkillsDTO)
                 .build();
     }
@@ -224,9 +243,21 @@ public class ProfileService {
         PostulantProfile profile = postulantRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new RuntimeException("Perfil de postulante no encontrado"));
 
+        if (request.getFirstName() != null && !request.getFirstName().isBlank()) {
+            profile.setFirstName(request.getFirstName().trim());
+        }
+        if (request.getLastName() != null && !request.getLastName().isBlank()) {
+            profile.setLastName(request.getLastName().trim());
+        }
         if (request.getCareer() != null) profile.setCareer(request.getCareer());
         if (request.getCurrentCycle() != null) profile.setCurrentCycle(request.getCurrentCycle());
         if (request.getCvUrl() != null) profile.setCvUrl(request.getCvUrl());
+        if (request.getAvatarUrl() != null) profile.setAvatarUrl(request.getAvatarUrl());
+        if (request.getBannerUrl() != null) profile.setBannerUrl(request.getBannerUrl());
+        if (request.getBannerText() != null) profile.setBannerText(request.getBannerText());
+        if (request.getCvUrl() != null) profile.setCvUrl(request.getCvUrl());
+        if (request.getCvFileName() != null) profile.setCvFileName(request.getCvFileName());
+        if (request.getCvFileSize() != null) profile.setCvFileSize(request.getCvFileSize());
         if (request.getHeadline() != null) profile.setHeadline(request.getHeadline());
         if (request.getBio() != null) profile.setBio(request.getBio());
 
@@ -451,11 +482,18 @@ public class ProfileService {
                 .career(profile.getCareer())
                 .currentCycle(profile.getCurrentCycle())
                 .cvUrl(profile.getCvUrl())
+                .avatarUrl(profile.getAvatarUrl())
+                .bannerUrl(profile.getBannerUrl())
+                .bannerText(profile.getBannerText())
+                .cvUrl(profile.getCvUrl())
+                .cvFileName(profile.getCvFileName())
+                .cvFileSize(profile.getCvFileSize())
                 .headline(profile.getHeadline())
                 .bio(profile.getBio())
                 .hasUniversityBase(profile.getHasUniversityBase())
                 .isInstitutionVerified(profile.getIsInstitutionVerified())
                 .institutionProfile(profile.getInstitutionProfile() != null ? profile.getInstitutionProfile().getId() : null)
+                .institutionName(profile.getInstitutionProfile() != null ? profile.getInstitutionProfile().getName() : null)
                 .skills(skillsDTO)
                 .build();
     }
