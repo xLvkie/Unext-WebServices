@@ -27,10 +27,6 @@ public class NotificationController {
         User user = (User) authentication.getPrincipal();
         assert user != null;
         return ResponseEntity.ok(notificationService.getMyNotifications(user.getEmail()));
-        /*
-        Retorna un listado de todas las notificaciones
-        El user requiere uso del token
-         */
     }
 
     @PreAuthorize("hasAnyAuthority('POSTULANT', 'INSTITUTION', 'RECRUITER')")
@@ -38,13 +34,28 @@ public class NotificationController {
     public ResponseEntity<NotificationResponseDTO> markAsRead(
             Authentication authentication,
             @PathVariable UUID notificationId) {
-
         User user = (User) authentication.getPrincipal();
         assert user != null;
         return ResponseEntity.ok(notificationService.markAsRead(user.getEmail(), notificationId));
-        /*
-        Cambia el estado de una notificación de No leido -> Leido
-        El user requiere uso del token
-         */
+    }
+
+    @PreAuthorize("hasAnyAuthority('POSTULANT', 'INSTITUTION', 'RECRUITER')")
+    @PatchMapping("/read-all")
+    public ResponseEntity<Void> markAllAsRead(Authentication authentication) {
+        User user = (User) authentication.getPrincipal();
+        assert user != null;
+        notificationService.markAllAsRead(user.getEmail());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PreAuthorize("hasAnyAuthority('POSTULANT', 'INSTITUTION', 'RECRUITER')")
+    @DeleteMapping("/{notificationId}")
+    public ResponseEntity<Void> deleteNotification(
+            Authentication authentication,
+            @PathVariable UUID notificationId) {
+        User user = (User) authentication.getPrincipal();
+        assert user != null;
+        notificationService.deleteNotification(user.getEmail(), notificationId);
+        return ResponseEntity.noContent().build();
     }
 }

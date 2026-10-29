@@ -26,6 +26,7 @@ public class FeedPostService {
     private final PostulantProfileRepository postulantRepository;
     private final RecruiterProfileRepository recruiterRepository;
     private final InstitutionProfileRepository institutionRepository;
+    private final NotificationService notificationService;
 
     // 1. CREAR PUBLICACIÓN
     @Transactional
@@ -85,6 +86,14 @@ public class FeedPostService {
             post.getLikedByUsers().removeIf(u -> u.getId().equals(currentUser.getId()));
         } else {
             post.getLikedByUsers().add(currentUser);
+            if (!post.getAuthor().getId().equals(currentUser.getId())) {
+                AuthorInfo actor = resolveAuthorData(currentUser);
+                notificationService.createNotification(
+                        post.getAuthor(),
+                        "Nueva reacción en tu publicación",
+                        actor.name() + " reaccionó a tu publicación en el feed."
+                );
+            }
         }
 
         feedPostRepository.save(post);
@@ -125,6 +134,14 @@ public class FeedPostService {
                 .build();
 
         feedCommentRepository.save(comment);
+        if (!post.getAuthor().getId().equals(user.getId())) {
+            AuthorInfo actor = resolveAuthorData(user);
+            notificationService.createNotification(
+                    post.getAuthor(),
+                    "Nuevo comentario en tu publicación",
+                    actor.name() + " comentó: \"" + comment.getContent() + "\""
+            );
+        }
         return mapCommentToDTO(comment);
     }
 
@@ -177,9 +194,15 @@ public class FeedPostService {
                 PostulantProfile p = postulantRepository.findByUserId(author.getId()).orElse(null);
                 if (p != null) {
                     profileId = p.getId();
-                    name = p.getFirstName() + " " + p.getLastName();
-                    headline = p.getHeadline() != null ? p.getHeadline() :
-                            (p.getCareer() != null ? "Estudiante de " + p.getCareer() : "Postulante");
+                    name = (p.getFirstName() + " " + p.getLastName()).trim();
+                    if (p.getHeadline() != null && !p.getHeadline().isBlank()) {
+                        headline = p.getHeadline();
+                    } else if (Boolean.TRUE.equals(p.getIsInstitutionVerified()) && p.getCareer() != null && !p.getCareer().isBlank()) {
+                        headline = (Boolean.TRUE.equals(p.getHasUniversityBase()) ? "Estudiante de " : "Egresado de ") + p.getCareer();
+                    } else {
+                        headline = "Talento Profesional en Unext";
+                    }
+                    avatarUrl = p.getAvatarUrl();
                     isVerified = Boolean.TRUE.equals(p.getIsInstitutionVerified());
                 }
             }
@@ -188,9 +211,11 @@ public class FeedPostService {
                 if (r != null) {
                     profileId = r.getId();
                     name = r.getCompanyName();
-                    headline = r.getIndustry() != null ? r.getIndustry() : "Empresa Reclutadora";
+                    headline = (r.getIndustry() != null && !r.getIndustry().isBlank())
+                            ? r.getIndustry()
+                            : "Empresa Reclutadora";
                     avatarUrl = r.getCompanyLogoUrl();
-                    isVerified = Boolean.TRUE.equals(r.getIsValidated());
+                    isVerified = Boolean.TRUE.equals(r.getIsValidated()) || Boolean.TRUE.equals(r.getIsVerified());
                 }
             }
             case INSTITUTION -> {
