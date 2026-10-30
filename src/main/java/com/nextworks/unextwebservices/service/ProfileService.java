@@ -493,6 +493,7 @@ public class ProfileService {
     @Transactional(readOnly = true)
     public PostulantProfileResponseDTO getPostulantProfileById(UUID postulantId) {
         PostulantProfile profile = postulantRepository.findByIdAndIsVerifiedTrue(postulantId)
+                .or(() -> postulantRepository.findByUserId(postulantId)) // prueba
                 .orElseThrow(() -> new RuntimeException("HTTP 404: Perfil de postulante no encontrado o no verificado"));
 
         List<StudentSkill> skills = studentSkillRepository.findByPostulantProfileId(profile.getId());

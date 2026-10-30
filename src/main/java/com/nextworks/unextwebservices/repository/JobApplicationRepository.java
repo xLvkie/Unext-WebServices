@@ -28,4 +28,7 @@ public interface JobApplicationRepository extends JpaRepository<JobApplication, 
             "ORDER BY COUNT(DISTINCT p.id) DESC, r.companyName ASC")
     List<TopCompanyDTO> findTopCompanies(@Param("institutionId") UUID institutionId, @Param("career") String career,
                                          @Param("status") ApplicationStatus status, Pageable pageable);
+
+    @Query("SELECT COUNT(a) > 0 FROM JobApplication a WHERE a.postulantProfile.id = :postulantId AND a.jobOffer.recruiterProfile.id = :recruiterId")
+    boolean hasPostulantAppliedToRecruiter(@Param("postulantId") UUID postulantId, @Param("recruiterId") UUID recruiterId);
 }
