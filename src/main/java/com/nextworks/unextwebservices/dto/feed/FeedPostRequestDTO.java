@@ -8,7 +8,6 @@ import java.util.List;
 public class FeedPostRequestDTO {
     @NotBlank(message = "El contenido de la publicación no puede estar vacío")
     private String content;
-
-    // Lista opcional de URLs de fotos, videos o documentos adjuntos
     private List<String> mediaUrls;
+    private Boolean isImportant;
 }

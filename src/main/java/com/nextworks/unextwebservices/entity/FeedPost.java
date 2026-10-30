@@ -32,14 +32,12 @@ public class FeedPost {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
-    // Permite adjuntar una o varias imágenes
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "feed_post_media", joinColumns = @JoinColumn(name = "post_id"))
     @Column(name = "media_url", columnDefinition = "TEXT")
     @Builder.Default
     private List<String> mediaUrls = new ArrayList<>();
 
-    // Usuarios que dieron "Me gusta" a la publicación
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "feed_post_likes",
@@ -53,6 +51,13 @@ public class FeedPost {
     @Builder.Default
     private List<FeedComment> comments = new ArrayList<>();
 
+    @Column(name = "is_important")
+    @Builder.Default
+    private Boolean isImportant = false;
+
+    @Column(name = "expires_at")
+    private LocalDateTime expiresAt;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -60,4 +65,14 @@ public class FeedPost {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @PrePersist
+    protected void onCreate() {
+        if (this.isImportant == null) {
+            this.isImportant = false;
+        }
+        if (!this.isImportant && this.expiresAt == null) {
+            this.expiresAt = LocalDateTime.now().plusDays(7);
+        }
+    }
 }

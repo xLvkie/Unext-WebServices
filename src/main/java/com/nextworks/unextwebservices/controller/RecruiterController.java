@@ -29,16 +29,6 @@ public class RecruiterController {
 
     private final RecruiterService recruiterService;
 
-    @PreAuthorize("hasAnyAuthority('POSTULANT', 'INSTITUTION', 'RECRUITER')")
-    @GetMapping("/directory")
-    public ResponseEntity<List<RecruiterDirectoryResponseDTO>> getAllRecruiters() {
-        return ResponseEntity.ok(recruiterService.getAllRecruiters());
-        /*
-        Retorna un listado de todos las empresas
-        Se quiere que el User use su token
-         */
-    }
-
     // Crear nueva vacante
     @PreAuthorize("hasAuthority('RECRUITER')")
     @PostMapping("/jobs")

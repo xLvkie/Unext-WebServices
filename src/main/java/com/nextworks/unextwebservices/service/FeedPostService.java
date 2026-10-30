@@ -5,6 +5,7 @@ import com.nextworks.unextwebservices.dto.feed.FeedCommentResponseDTO;
 import com.nextworks.unextwebservices.dto.feed.FeedPostRequestDTO;
 import com.nextworks.unextwebservices.dto.feed.FeedPostResponseDTO;
 import com.nextworks.unextwebservices.entity.*;
+import com.nextworks.unextwebservices.entity.enums.Role;
 import com.nextworks.unextwebservices.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -19,6 +21,8 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class FeedPostService {
+
+    private static final int DEFAULT_TTL_DAYS = 7;
 
     private final FeedPostRepository feedPostRepository;
     private final FeedCommentRepository feedCommentRepository;
@@ -28,6 +32,15 @@ public class FeedPostService {
     private final InstitutionProfileRepository institutionRepository;
     private final NotificationService notificationService;
 
+    // Límite de publicaciones importantes según el segmento
+    private int getMaxImportantPostsForRole(Role role) {
+        return switch (role) {
+            case POSTULANT -> 3;
+            case RECRUITER -> 5;
+            case INSTITUTION -> 6;
+        };
+    }
+
     // 1. CREAR PUBLICACIÓN
     @Transactional
     public FeedPostResponseDTO createPost(String email, FeedPostRequestDTO request) {
@@ -35,22 +48,39 @@ public class FeedPostService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
 
         validateAuthorCanPublish(user);
+        purgeExpiredPosts();
+
+        boolean markImportant = Boolean.TRUE.equals(request.getIsImportant());
+        if (markImportant) {
+            int maxAllowed = getMaxImportantPostsForRole(user.getRole());
+            long currentImportant = feedPostRepository.countByAuthorIdAndIsImportantTrue(user.getId());
+            if (currentImportant >= maxAllowed) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Has alcanzado tu límite de " + maxAllowed + " publicaciones importantes para tu tipo de cuenta."
+                );
+            }
+        }
 
         FeedPost post = FeedPost.builder()
                 .author(user)
                 .content(request.getContent().trim())
                 .mediaUrls(request.getMediaUrls() != null ? request.getMediaUrls() : new ArrayList<>())
+                .isImportant(markImportant)
+                .expiresAt(markImportant ? null : LocalDateTime.now().plusDays(DEFAULT_TTL_DAYS))
                 .build();
 
         feedPostRepository.save(post);
         return mapToDTO(post, user.getId());
     }
 
-    // 2. OBTENER EL FEED GENERAL
-    @Transactional(readOnly = true)
+    // 2. OBTENER EL FEED GENERAL (Purga expirados antes de listar)
+    @Transactional
     public List<FeedPostResponseDTO> getGlobalFeed(String email) {
         User currentUser = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
+
+        purgeExpiredPosts();
 
         return feedPostRepository.findAllByOrderByCreatedAtDesc()
                 .stream()
@@ -59,15 +89,64 @@ public class FeedPostService {
     }
 
     // 3. OBTENER PUBLICACIONES DE UN USUARIO ESPECÍFICO
-    @Transactional(readOnly = true)
+    @Transactional
     public List<FeedPostResponseDTO> getPostsByUser(UUID authorUserId, String currentEmail) {
         User currentUser = userRepository.findByEmail(currentEmail)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
+
+        purgeExpiredPosts();
 
         return feedPostRepository.findByAuthorIdOrderByCreatedAtDesc(authorUserId)
                 .stream()
                 .map(post -> mapToDTO(post, currentUser.getId()))
                 .toList();
+    }
+
+    // 3B. OBTENER SOLO LAS PUBLICACIONES IMPORTANTES DE UN USUARIO (Para la Card del Perfil)
+    @Transactional(readOnly = true)
+    public List<FeedPostResponseDTO> getImportantPostsByUser(UUID authorUserId, String currentEmail) {
+        User currentUser = userRepository.findByEmail(currentEmail)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
+
+        return feedPostRepository.findByAuthorIdAndIsImportantTrueOrderByCreatedAtDesc(authorUserId)
+                .stream()
+                .map(post -> mapToDTO(post, currentUser.getId()))
+                .toList();
+    }
+
+    // 3C. MARCAR O DESMARCAR PUBLICACIÓN COMO IMPORTANTE (PIN / UNPIN)
+    @Transactional
+    public FeedPostResponseDTO toggleImportant(UUID postId, String email) {
+        User currentUser = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
+
+        FeedPost post = feedPostRepository.findById(postId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Publicación no encontrada"));
+
+        if (!post.getAuthor().getId().equals(currentUser.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Solo puedes destacar tus propias publicaciones");
+        }
+
+        boolean nextState = !Boolean.TRUE.equals(post.getIsImportant());
+        if (nextState) {
+            int maxAllowed = getMaxImportantPostsForRole(currentUser.getRole());
+            long currentImportant = feedPostRepository.countByAuthorIdAndIsImportantTrue(currentUser.getId());
+            if (currentImportant >= maxAllowed) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Solo puedes tener hasta " + maxAllowed + " publicaciones importantes. Desmarca una primero."
+                );
+            }
+            post.setIsImportant(true);
+            post.setExpiresAt(null); // No se borra mientras sea importante
+        } else {
+            post.setIsImportant(false);
+            // Al quitarla de importantes, se le asignan 7 días de vida a partir de ahora
+            post.setExpiresAt(LocalDateTime.now().plusDays(DEFAULT_TTL_DAYS));
+        }
+
+        feedPostRepository.save(post);
+        return mapToDTO(post, currentUser.getId());
     }
 
     // 4. DAR O QUITAR "ME GUSTA" (TOGGLE LIKE)
@@ -158,7 +237,7 @@ public class FeedPostService {
                 .toList();
     }
 
-    // 8. ELIMINAR UN COMENTARIO (Autor del comentario o dueño del post)
+    // 8. ELIMINAR UN COMENTARIO
     @Transactional
     public void deleteComment(UUID commentId, String email) {
         User currentUser = userRepository.findByEmail(email)
@@ -175,6 +254,11 @@ public class FeedPostService {
         }
 
         feedCommentRepository.delete(comment);
+    }
+
+    @Transactional
+    protected void purgeExpiredPosts() {
+        feedPostRepository.deleteExpiredPosts(LocalDateTime.now());
     }
 
     /* ==========================================================
@@ -281,6 +365,8 @@ public class FeedPostService {
                 .likesCount(post.getLikedByUsers().size())
                 .commentsCount(commentsCount)
                 .likedByMe(likedByMe)
+                .isImportant(Boolean.TRUE.equals(post.getIsImportant()))
+                .expiresAt(post.getExpiresAt())
                 .createdAt(post.getCreatedAt())
                 .build();
     }

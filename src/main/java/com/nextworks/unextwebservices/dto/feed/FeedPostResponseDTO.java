@@ -23,5 +23,7 @@ public class FeedPostResponseDTO {
     private int likesCount;
     private long commentsCount;
     private boolean likedByMe;
+    private boolean isImportant;
+    private LocalDateTime expiresAt;
     private LocalDateTime createdAt;
 }

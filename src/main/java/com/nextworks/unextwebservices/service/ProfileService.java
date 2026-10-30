@@ -2,6 +2,7 @@ package com.nextworks.unextwebservices.service;
 
 import com.nextworks.unextwebservices.dto.directory.InstitutionDirectoryResponseDTO;
 import com.nextworks.unextwebservices.dto.directory.PostulantDirectoryResponseDTO;
+import com.nextworks.unextwebservices.dto.directory.RecruiterDirectoryResponseDTO;
 import com.nextworks.unextwebservices.dto.profile.*;
 import com.nextworks.unextwebservices.entity.*;
 
@@ -582,6 +583,19 @@ public class ProfileService {
                 .logoUrl(profile.getLogoUrl())
                 .description(profile.getDescription())
                 .build();
+    }
+
+    // LISTADO DE TODOS LOS RECLUTADORES
+    @Transactional(readOnly = true)
+    public List<RecruiterDirectoryResponseDTO> getAllRecruiters() {
+        List<RecruiterProfile> recruiters = recruiterRepository.findByIsVerifiedTrue();
+
+        return recruiters.stream().map(profile -> RecruiterDirectoryResponseDTO.builder()
+                .id(profile.getId())
+                .userId(profile.getUser().getId())
+                .companyName(profile.getCompanyName())
+                .build()
+        ).toList();
     }
 
     // PERFIL ESPECIFICO DE UN RECLUTADOR / EMPRESA (Solo si está verificado corporativamente)

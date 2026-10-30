@@ -110,4 +110,26 @@ public class FeedPostController {
         feedPostService.deleteComment(commentId, user.getEmail());
         return ResponseEntity.ok("Comentario eliminado exitosamente");
     }
+
+    @Operation(summary = "Marcar o desmarcar una publicación propia como Importante (no caduca)")
+    @PreAuthorize("hasAnyAuthority('POSTULANT', 'RECRUITER', 'INSTITUTION')")
+    @PatchMapping("/{postId}/important")
+    public ResponseEntity<FeedPostResponseDTO> toggleImportant(
+            Authentication authentication,
+            @PathVariable UUID postId) {
+        User user = (User) authentication.getPrincipal();
+        assert user != null;
+        return ResponseEntity.ok(feedPostService.toggleImportant(postId, user.getEmail()));
+    }
+
+    @Operation(summary = "Obtener las publicaciones importantes fijadas de un usuario")
+    @PreAuthorize("hasAnyAuthority('POSTULANT', 'RECRUITER', 'INSTITUTION')")
+    @GetMapping("/user/{authorUserId}/important")
+    public ResponseEntity<List<FeedPostResponseDTO>> getImportantPostsByUser(
+            Authentication authentication,
+            @PathVariable UUID authorUserId) {
+        User user = (User) authentication.getPrincipal();
+        assert user != null;
+        return ResponseEntity.ok(feedPostService.getImportantPostsByUser(authorUserId, user.getEmail()));
+    }
 }
