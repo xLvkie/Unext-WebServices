@@ -60,4 +60,24 @@ public class ConnectionController {
         connectionService.removeOrCancelConnection(user.getEmail(), targetUserId);
         return ResponseEntity.noContent().build();
     }
+
+    @PreAuthorize("hasAnyAuthority('POSTULANT', 'RECRUITER', 'INSTITUTION')")
+    @GetMapping("/overview")
+    public ResponseEntity<com.nextworks.unextwebservices.dto.connection.NetworkOverviewDTO> getNetworkOverview(
+            Authentication authentication) {
+        User user = (User) authentication.getPrincipal();
+        assert user != null;
+        return ResponseEntity.ok(connectionService.getNetworkOverview(user.getEmail()));
+    }
+
+    @PreAuthorize("hasAnyAuthority('POSTULANT', 'RECRUITER', 'INSTITUTION')")
+    @PostMapping("/follow/{targetUserId}")
+    public ResponseEntity<java.util.Map<String, Boolean>> toggleFollow(
+            Authentication authentication,
+            @PathVariable UUID targetUserId) {
+        User user = (User) authentication.getPrincipal();
+        assert user != null;
+        boolean following = connectionService.toggleFollow(user.getEmail(), targetUserId);
+        return ResponseEntity.ok(java.util.Map.of("following", following));
+    }
 }

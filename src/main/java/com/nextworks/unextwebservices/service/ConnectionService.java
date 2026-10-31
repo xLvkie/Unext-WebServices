@@ -1,6 +1,8 @@
 package com.nextworks.unextwebservices.service;
 
 import com.nextworks.unextwebservices.dto.connection.ConnectionStatusResponseDTO;
+import com.nextworks.unextwebservices.dto.connection.NetworkOverviewDTO;
+import com.nextworks.unextwebservices.dto.connection.NetworkPersonCardDTO;
 import com.nextworks.unextwebservices.entity.*;
 import com.nextworks.unextwebservices.entity.enums.ConnectionStatus;
 import com.nextworks.unextwebservices.entity.enums.Role;
@@ -11,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -25,6 +28,7 @@ public class ConnectionService {
     private final InstitutionProfileRepository institutionRepository;
     private final JobApplicationRepository jobApplicationRepository;
     private final NotificationService notificationService;
+    private final UserFollowRepository followRepository;
 
     @Transactional(readOnly = true)
     public ConnectionStatusResponseDTO getStatusWithUser(String currentEmail, UUID targetUserId) {
@@ -149,6 +153,230 @@ public class ConnectionService {
 
         connectionRepository.findBetweenUsers(currentUser.getId(), targetUserId)
                 .ifPresent(connectionRepository::delete);
+    }
+
+    @Transactional(readOnly = true)
+    public NetworkOverviewDTO getNetworkOverview(String currentEmail) {
+        User currentUser = userRepository.findByEmail(currentEmail)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
+
+        UUID myUserId = currentUser.getId();
+
+        // Invitaciones recibidas pendientes
+        List<UserConnection> receivedList = connectionRepository
+                .findByAddresseeIdAndStatusOrderByCreatedAtDesc(myUserId, ConnectionStatus.PENDING);
+
+        // Invitaciones enviadas pendientes
+        List<UserConnection> sentList = connectionRepository
+                .findByRequesterIdAndStatusOrderByCreatedAtDesc(myUserId, ConnectionStatus.PENDING);
+
+        // Contactos confirmados (ACCEPTED)
+        List<UserConnection> acceptedList = connectionRepository
+                .findAllByUserAndStatus(myUserId, ConnectionStatus.ACCEPTED);
+
+        // Usuarios seguidos
+        List<UserFollow> followList = followRepository.findByFollowerIdOrderByCreatedAtDesc(myUserId);
+        java.util.Set<UUID> followedUserIds = followList.stream()
+                .map(f -> f.getFollowed().getId())
+                .collect(java.util.stream.Collectors.toSet());
+
+        List<NetworkPersonCardDTO> receivedDTOs = receivedList.stream()
+                .map(c -> buildPersonCard(currentUser, c.getRequester(), c.getId(), "PENDING_RECEIVED",
+                        followedUserIds.contains(c.getRequester().getId()), c.getCreatedAt()))
+                .filter(java.util.Objects::nonNull)
+                .toList();
+
+        List<NetworkPersonCardDTO> sentDTOs = sentList.stream()
+                .map(c -> buildPersonCard(currentUser, c.getAddressee(), c.getId(), "PENDING_SENT",
+                        followedUserIds.contains(c.getAddressee().getId()), c.getCreatedAt()))
+                .filter(java.util.Objects::nonNull)
+                .toList();
+
+        List<NetworkPersonCardDTO> connectionsDTOs = acceptedList.stream()
+                .map(c -> {
+                    User other = c.getRequester().getId().equals(myUserId) ? c.getAddressee() : c.getRequester();
+                    return buildPersonCard(currentUser, other, c.getId(), "CONNECTED",
+                            followedUserIds.contains(other.getId()), c.getCreatedAt());
+                })
+                .filter(java.util.Objects::nonNull)
+                .toList();
+
+        List<NetworkPersonCardDTO> followingDTOs = followList.stream()
+                .map(f -> {
+                    User target = f.getFollowed();
+                    Optional<UserConnection> conn = connectionRepository.findBetweenUsers(myUserId, target.getId());
+                    String status = conn.map(c -> c.getStatus() == ConnectionStatus.ACCEPTED ? "CONNECTED"
+                                    : (c.getRequester().getId().equals(myUserId) ? "PENDING_SENT" : "PENDING_RECEIVED"))
+                            .orElse("NONE");
+                    UUID connId = conn.map(UserConnection::getId).orElse(null);
+                    return buildPersonCard(currentUser, target, connId, status, true, f.getCreatedAt());
+                })
+                .filter(java.util.Objects::nonNull)
+                .toList();
+
+        // IDs que ya tienen vínculo activo (para no repetirlos en Recomendaciones de conexión)
+        java.util.Set<UUID> excludedFromRecs = new java.util.HashSet<>();
+        excludedFromRecs.add(myUserId);
+        receivedDTOs.forEach(d -> excludedFromRecs.add(d.getUserId()));
+        sentDTOs.forEach(d -> excludedFromRecs.add(d.getUserId()));
+        connectionsDTOs.forEach(d -> excludedFromRecs.add(d.getUserId()));
+
+        // Recomendaciones (Postulantes verificados, Empresas verificadas e Instituciones verificadas)
+        java.util.List<NetworkPersonCardDTO> recommendations = new java.util.ArrayList<>();
+
+        postulantRepository.findByIsVerifiedTrue().forEach(p -> {
+            UUID uid = p.getUser().getId();
+            if (!excludedFromRecs.contains(uid)) {
+                NetworkPersonCardDTO card = buildPersonCard(currentUser, p.getUser(), null, "NONE",
+                        followedUserIds.contains(uid), p.getCreatedAt());
+                if (card != null) recommendations.add(card);
+            }
+        });
+
+        recruiterRepository.findByIsVerifiedTrue().forEach(r -> {
+            UUID uid = r.getUser().getId();
+            if (!excludedFromRecs.contains(uid)) {
+                NetworkPersonCardDTO card = buildPersonCard(currentUser, r.getUser(), null, "NONE",
+                        followedUserIds.contains(uid), null);
+                if (card != null) recommendations.add(card);
+            }
+        });
+
+        institutionRepository.findByIsVerifiedTrue().forEach(i -> {
+            UUID uid = i.getUser().getId();
+            if (!excludedFromRecs.contains(uid)) {
+                NetworkPersonCardDTO card = buildPersonCard(currentUser, i.getUser(), null, "NONE",
+                        followedUserIds.contains(uid), null);
+                if (card != null) recommendations.add(card);
+            }
+        });
+
+        return NetworkOverviewDTO.builder()
+                .connectionsCount(connectionsDTOs.size())
+                .receivedInvitationsCount(receivedDTOs.size())
+                .sentInvitationsCount(sentDTOs.size())
+                .followingCount(followingDTOs.size())
+                .receivedInvitations(receivedDTOs)
+                .sentInvitations(sentDTOs)
+                .connections(connectionsDTOs)
+                .following(followingDTOs)
+                .recommendations(recommendations)
+                .build();
+    }
+
+    @Transactional
+    public boolean toggleFollow(String currentEmail, UUID targetUserId) {
+        User currentUser = userRepository.findByEmail(currentEmail)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
+
+        User targetUser = userRepository.findById(targetUserId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario destino no encontrado"));
+
+        if (currentUser.getId().equals(targetUser.getId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No puedes seguirte a ti mismo.");
+        }
+
+        Optional<UserFollow> existing = followRepository.findByFollowerIdAndFollowedId(currentUser.getId(), targetUserId);
+        if (existing.isPresent()) {
+            followRepository.delete(existing.get());
+            return false; // Dejó de seguir
+        } else {
+            UserFollow follow = UserFollow.builder()
+                    .follower(currentUser)
+                    .followed(targetUser)
+                    .build();
+            followRepository.save(follow);
+            return true; // Ahora lo sigue
+        }
+    }
+
+    private NetworkPersonCardDTO buildPersonCard(
+            User currentUser,
+            User targetUser,
+            UUID connectionId,
+            String connectionStatus,
+            boolean isFollowing,
+            java.time.LocalDateTime createdAt
+    ) {
+        String restriction = evaluateConnectionRestriction(currentUser, targetUser);
+
+        switch (targetUser.getRole()) {
+            case POSTULANT -> {
+                PostulantProfile p = postulantRepository.findByUserId(targetUser.getId()).orElse(null);
+                if (p == null) return null;
+                String fullName = (p.getFirstName() + " " + p.getLastName()).trim();
+                String headline = (p.getHeadline() != null && !p.getHeadline().isBlank())
+                        ? p.getHeadline()
+                        : (p.getCareer() != null ? "Estudiante de " + p.getCareer() : "Talento Profesional en Unext");
+                String subtitle = p.getInstitutionProfile() != null
+                        ? p.getInstitutionProfile().getName()
+                        : "Comunidad Unext";
+
+                return NetworkPersonCardDTO.builder()
+                        .connectionId(connectionId)
+                        .userId(targetUser.getId())
+                        .profileId(p.getId())
+                        .role("POSTULANT")
+                        .name(fullName)
+                        .headline(headline)
+                        .subtitle(subtitle)
+                        .avatarUrl(p.getAvatarUrl())
+                        .bannerUrl(p.getBannerUrl())
+                        .bannerText(p.getBannerText() != null ? p.getBannerText() : p.getCareer())
+                        .isVerified(Boolean.TRUE.equals(p.getIsInstitutionVerified()))
+                        .connectionStatus(connectionStatus)
+                        .isFollowing(isFollowing)
+                        .canConnect(restriction == null)
+                        .restrictionReason(restriction)
+                        .createdAt(createdAt)
+                        .build();
+            }
+            case RECRUITER -> {
+                RecruiterProfile r = recruiterRepository.findByUserId(targetUser.getId()).orElse(null);
+                if (r == null) return null;
+                return NetworkPersonCardDTO.builder()
+                        .connectionId(connectionId)
+                        .userId(targetUser.getId())
+                        .profileId(r.getId())
+                        .role("RECRUITER")
+                        .name(r.getCompanyName())
+                        .headline(r.getIndustry() != null ? r.getIndustry() : "Sector Corporativo")
+                        .subtitle("Empresa Reclutadora · RUC " + r.getRuc())
+                        .avatarUrl(r.getCompanyLogoUrl())
+                        .bannerUrl(null)
+                        .bannerText(r.getCompanyName())
+                        .isVerified(Boolean.TRUE.equals(r.getIsValidated()) || Boolean.TRUE.equals(r.getIsVerified()))
+                        .connectionStatus(connectionStatus)
+                        .isFollowing(isFollowing)
+                        .canConnect(restriction == null)
+                        .restrictionReason(restriction)
+                        .createdAt(createdAt)
+                        .build();
+            }
+            case INSTITUTION -> {
+                InstitutionProfile i = institutionRepository.findByUserId(targetUser.getId()).orElse(null);
+                if (i == null) return null;
+                return NetworkPersonCardDTO.builder()
+                        .connectionId(connectionId)
+                        .userId(targetUser.getId())
+                        .profileId(i.getId())
+                        .role("INSTITUTION")
+                        .name(i.getName())
+                        .headline("Institución Educativa Oficial")
+                        .subtitle("Dominio: " + i.getDomain())
+                        .avatarUrl(i.getLogoUrl())
+                        .bannerUrl(null)
+                        .bannerText(i.getName())
+                        .isVerified(Boolean.TRUE.equals(i.getIsVerified()))
+                        .connectionStatus(connectionStatus)
+                        .isFollowing(isFollowing)
+                        .canConnect(restriction == null)
+                        .restrictionReason(restriction)
+                        .createdAt(createdAt)
+                        .build();
+            }
+        }
+        return null;
     }
 
     /* =========================================================================

@@ -20,8 +20,11 @@ public interface UserConnectionRepository extends JpaRepository<UserConnection, 
     Optional<UserConnection> findBetweenUsers(@Param("userA") UUID userA, @Param("userB") UUID userB);
 
     @Query("SELECT c FROM UserConnection c WHERE " +
-            "(c.requester.id = :userId OR c.addressee.id = :userId) AND c.status = :status")
+            "(c.requester.id = :userId OR c.addressee.id = :userId) AND c.status = :status " +
+            "ORDER BY c.createdAt DESC")
     List<UserConnection> findAllByUserAndStatus(@Param("userId") UUID userId, @Param("status") ConnectionStatus status);
 
     List<UserConnection> findByAddresseeIdAndStatusOrderByCreatedAtDesc(UUID addresseeId, ConnectionStatus status);
+
+    List<UserConnection> findByRequesterIdAndStatusOrderByCreatedAtDesc(UUID requesterId, ConnectionStatus status);
 }
