@@ -14,8 +14,12 @@ import java.util.UUID;
 public class RecruiterApplicationResponseDTO {
     private UUID id;
     private UUID postulantProfileId;
+    private UUID postulantUserId;
     private String firstName;
     private String lastName;
+    private String avatarUrl;
+    private String cvUrl;
+    private String cvFileName;
     private String career;
     private Integer currentCycle;
     private String headline;
@@ -27,5 +31,5 @@ public class RecruiterApplicationResponseDTO {
     private CompatibilityLabel compatibilityLabel;
     private String matchingHint;
     private Double averageStars;
-    private Integer reviewCount;
+    private Long reviewCount;
 }

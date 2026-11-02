@@ -33,8 +33,20 @@ public class RecruiterProfile {
     @Column(length = 100)
     private String industry;
 
+    @Column(length = 120)
+    private String headline;
+
+    @Column(name = "website_url", length = 255)
+    private String websiteUrl;
+
     @Column(name = "company_logo_url", columnDefinition = "TEXT")
     private String companyLogoUrl;
+
+    @Column(name = "banner_url", columnDefinition = "TEXT")
+    private String bannerUrl;
+
+    @Column(name = "banner_text", length = 35)
+    private String bannerText;
 
     @Column(columnDefinition = "TEXT")
     private String description;

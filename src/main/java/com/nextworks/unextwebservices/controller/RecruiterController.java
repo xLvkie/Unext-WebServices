@@ -2,7 +2,6 @@ package com.nextworks.unextwebservices.controller;
 
 import com.nextworks.unextwebservices.dto.agreement.AgreementCreateRequestDTO;
 import com.nextworks.unextwebservices.dto.agreement.AgreementResponseDTO;
-import com.nextworks.unextwebservices.dto.directory.RecruiterDirectoryResponseDTO;
 import com.nextworks.unextwebservices.dto.job.JobOfferRequestDTO;
 import com.nextworks.unextwebservices.dto.job.JobOfferResponseDTO;
 import com.nextworks.unextwebservices.dto.job.JobOfferUpdateDTO;

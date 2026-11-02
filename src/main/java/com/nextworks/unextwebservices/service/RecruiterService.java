@@ -180,8 +180,12 @@ public class RecruiterService {
                     return RecruiterApplicationResponseDTO.builder()
                             .id(app.getId())
                             .postulantProfileId(postulant.getId())
+                            .postulantUserId(postulant.getUser().getId())
                             .firstName(postulant.getFirstName())
                             .lastName(postulant.getLastName())
+                            .avatarUrl(postulant.getAvatarUrl())
+                            .cvUrl(postulant.getCvUrl())
+                            .cvFileName(postulant.getCvFileName())
                             .career(postulant.getCareer())
                             .currentCycle(postulant.getCurrentCycle())
                             .headline(postulant.getHeadline())
@@ -325,18 +329,6 @@ public class RecruiterService {
         offer.setIsActive(false);
         jobOfferRepository.save(offer);
         return mapToDTO(offer);
-    }
-
-    // LISTADO DE TODAS LAS EMPRESAS
-    @Transactional(readOnly = true)
-    public List<RecruiterDirectoryResponseDTO> getAllRecruiters() {
-        return recruiterRepository.findByIsVerifiedTrue().stream()
-                .map(r -> RecruiterDirectoryResponseDTO.builder()
-                        .id(r.getId())
-                        .userId(r.getUser().getId())
-                        .companyName(r.getCompanyName())
-                        .build())
-                .toList();
     }
 
     /* ==============================================

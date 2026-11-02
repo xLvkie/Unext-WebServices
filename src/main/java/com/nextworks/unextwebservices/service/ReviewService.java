@@ -193,6 +193,6 @@ public class ReviewService {
                 .build();
     }
 
-    public record ReputationSnapshot(Double averageStars, int totalReviews) {
+    public record ReputationSnapshot(Double averageStars, long totalReviews) {
     }
 }

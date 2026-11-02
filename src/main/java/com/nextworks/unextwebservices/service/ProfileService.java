@@ -72,30 +72,34 @@ public class ProfileService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
-        if (user.getIsProfileCompleted()) {
+        if (Boolean.TRUE.equals(user.getIsProfileCompleted())) {
             throw new RuntimeException("El perfil ya está completado");
         }
 
-        // Validación de formato RUC (11 dígitos, empieza con 10 o 20)
-        if (request.getRuc() == null || !request.getRuc().matches("^(10|20)\\d{9}$")) {
+        String cleanRuc = request.getRuc() != null ? request.getRuc().trim() : "";
+        if (!cleanRuc.matches("^(10|20)\\d{9}$")) {
             throw new RuntimeException("HTTP 400: El RUC debe tener 11 dígitos válidos y comenzar con 10 o 20.");
         }
 
-        if (recruiterRepository.existsByRuc(request.getRuc())) {
+        if (recruiterRepository.existsByRuc(cleanRuc)) {
             throw new RuntimeException("HTTP 409: Ya existe una empresa registrada con este RUC.");
         }
 
-        // Generamos código OTP de 6 dígitos para verificación corporativa
         String otpCode = String.format("%06d", new java.util.Random().nextInt(999999));
 
         RecruiterProfile profile = RecruiterProfile.builder()
                 .user(user)
-                .companyName(request.getCompanyName())
-                .ruc(request.getRuc())
+                .companyName(request.getCompanyName().trim())
+                .ruc(cleanRuc)
                 .industry(request.getIndustry())
+                .headline(request.getHeadline())
+                .websiteUrl(request.getWebsiteUrl())
                 .description(request.getDescription())
+                .companyLogoUrl(request.getCompanyLogoUrl())
+                .bannerUrl(request.getBannerUrl())
+                .bannerText(request.getBannerText())
                 .isValidated(false)
-                .isVerified(false) // Permanece oculto hasta verificar el código
+                .isVerified(false)
                 .verificationCode(otpCode)
                 .build();
 
@@ -277,12 +281,13 @@ public class ProfileService {
     /* ============================================
     // Mostrar y editar datos del perfil reclutador
     // ============================================ */
+    @Transactional(readOnly = true)
     public RecruiterProfileResponseDTO getMyRecruiterProfile(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
         RecruiterProfile profile = recruiterRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new RuntimeException("Perfil de reclutador no encontrado"));
+                .orElseThrow(() -> new RuntimeException("HTTP 404: Perfil de reclutador no encontrado"));
 
         return RecruiterProfileResponseDTO.builder()
                 .id(profile.getId())
@@ -290,8 +295,16 @@ public class ProfileService {
                 .companyName(profile.getCompanyName())
                 .ruc(profile.getRuc())
                 .industry(profile.getIndustry())
+                .headline(profile.getHeadline())
+                .websiteUrl(profile.getWebsiteUrl())
                 .description(profile.getDescription())
-                .isValidated(profile.getIsValidated())
+                .companyLogoUrl(profile.getCompanyLogoUrl())
+                .bannerUrl(profile.getBannerUrl())
+                .bannerText(profile.getBannerText())
+                .isValidated(Boolean.TRUE.equals(profile.getIsValidated()))
+                .isVerified(Boolean.TRUE.equals(profile.getIsVerified()))
+                .validationsCount(profile.getValidationsCount() != null ? profile.getValidationsCount() : 0)
+                .pendingVerificationCode(!Boolean.TRUE.equals(profile.getIsVerified()) ? profile.getVerificationCode() : null)
                 .build();
     }
 
@@ -303,12 +316,57 @@ public class ProfileService {
         RecruiterProfile profile = recruiterRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new RuntimeException("Perfil de reclutador no encontrado"));
 
-        if (request.getCompanyName() != null) profile.setCompanyName(request.getCompanyName());
+        if (request.getCompanyName() != null && !request.getCompanyName().isBlank()) {
+            profile.setCompanyName(request.getCompanyName().trim());
+        }
         if (request.getIndustry() != null) profile.setIndustry(request.getIndustry());
+        if (request.getHeadline() != null) profile.setHeadline(request.getHeadline());
+        if (request.getWebsiteUrl() != null) profile.setWebsiteUrl(request.getWebsiteUrl());
         if (request.getDescription() != null) profile.setDescription(request.getDescription());
+        if (request.getCompanyLogoUrl() != null) profile.setCompanyLogoUrl(request.getCompanyLogoUrl());
+        if (request.getBannerUrl() != null) profile.setBannerUrl(request.getBannerUrl());
+        if (request.getBannerText() != null) profile.setBannerText(request.getBannerText());
 
         recruiterRepository.save(profile);
         return getMyRecruiterProfile(email);
+    }
+
+    // LISTADO DE TODOS LOS RECLUTADORES
+    @Transactional(readOnly = true)
+    public List<RecruiterDirectoryResponseDTO> getAllRecruiters() {
+        List<RecruiterProfile> recruiters = recruiterRepository.findByIsVerifiedTrue();
+
+        return recruiters.stream().map(profile -> RecruiterDirectoryResponseDTO.builder()
+                .id(profile.getId())
+                .userId(profile.getUser().getId())
+                .companyName(profile.getCompanyName())
+                .build()
+        ).toList();
+    }
+
+    // PERFIL ESPECIFICO DE UN RECLUTADOR / EMPRESA (Solo si está verificado corporativamente)
+    @Transactional(readOnly = true)
+    public RecruiterProfileResponseDTO getRecruiterProfileById(UUID recruiterId) {
+        RecruiterProfile profile = recruiterRepository.findByIdAndIsVerifiedTrue(recruiterId)
+                .or(() -> recruiterRepository.findByUserId(recruiterId))
+                .orElseThrow(() -> new RuntimeException("HTTP 404: Perfil de empresa no encontrado o pendiente de verificación"));
+
+        return RecruiterProfileResponseDTO.builder()
+                .id(profile.getId())
+                .userId(profile.getUser().getId())
+                .companyName(profile.getCompanyName())
+                .ruc(profile.getRuc())
+                .industry(profile.getIndustry())
+                .headline(profile.getHeadline())
+                .websiteUrl(profile.getWebsiteUrl())
+                .description(profile.getDescription())
+                .companyLogoUrl(profile.getCompanyLogoUrl())
+                .bannerUrl(profile.getBannerUrl())
+                .bannerText(profile.getBannerText())
+                .isValidated(Boolean.TRUE.equals(profile.getIsValidated()))
+                .isVerified(Boolean.TRUE.equals(profile.getIsVerified()))
+                .validationsCount(profile.getValidationsCount() != null ? profile.getValidationsCount() : 0)
+                .build();
     }
 
     /* ============================================
@@ -416,7 +474,7 @@ public class ProfileService {
                 .toList();
     }
 
-    // ACTUALIZAR HABILIDAD TECNICA (Incluye marcar/desmarcar como Principal Aptitud con tope de 3)
+    // ACTUALIZAR HABILIDAD TECNICA
     @Transactional
     public StudentSkillResponseDTO updateSkill(String email, UUID skillId, StudentSkillUpdateDTO request) {
         User user = userRepository.findByEmail(email)
@@ -582,36 +640,6 @@ public class ProfileService {
                 .domain(profile.getDomain())
                 .logoUrl(profile.getLogoUrl())
                 .description(profile.getDescription())
-                .build();
-    }
-
-    // LISTADO DE TODOS LOS RECLUTADORES
-    @Transactional(readOnly = true)
-    public List<RecruiterDirectoryResponseDTO> getAllRecruiters() {
-        List<RecruiterProfile> recruiters = recruiterRepository.findByIsVerifiedTrue();
-
-        return recruiters.stream().map(profile -> RecruiterDirectoryResponseDTO.builder()
-                .id(profile.getId())
-                .userId(profile.getUser().getId())
-                .companyName(profile.getCompanyName())
-                .build()
-        ).toList();
-    }
-
-    // PERFIL ESPECIFICO DE UN RECLUTADOR / EMPRESA (Solo si está verificado corporativamente)
-    @Transactional(readOnly = true)
-    public RecruiterProfileResponseDTO getRecruiterProfileById(UUID recruiterId) {
-        RecruiterProfile profile = recruiterRepository.findByIdAndIsVerifiedTrue(recruiterId)
-                .orElseThrow(() -> new RuntimeException("HTTP 404: Perfil de empresa no encontrado o pendiente de verificación"));
-
-        return RecruiterProfileResponseDTO.builder()
-                .id(profile.getId())
-                .userId(profile.getUser().getId())
-                .companyName(profile.getCompanyName())
-                .ruc(profile.getRuc())
-                .industry(profile.getIndustry())
-                .description(profile.getDescription())
-                .isValidated(profile.getIsValidated())
                 .build();
     }
 }
