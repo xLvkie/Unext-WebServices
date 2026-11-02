@@ -10,4 +10,6 @@ public class RecruiterDirectoryResponseDTO {
     private UUID id;
     private UUID userId;
     private String companyName;
+    private String industry;
+    private String companyLogoUrl;
 }

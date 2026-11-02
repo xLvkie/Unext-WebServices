@@ -1,5 +1,6 @@
 package com.nextworks.unextwebservices.dto.profile;
 
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -13,6 +14,8 @@ public class RecruiterProfileUpdateDTO {
 
     @Size(max = 120)
     private String headline;
+
+    // private String ruc;
 
     private String websiteUrl;
 

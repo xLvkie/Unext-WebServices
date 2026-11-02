@@ -340,6 +340,8 @@ public class ProfileService {
                 .id(profile.getId())
                 .userId(profile.getUser().getId())
                 .companyName(profile.getCompanyName())
+                .industry(profile.getIndustry())
+                .companyLogoUrl(profile.getCompanyLogoUrl())
                 .build()
         ).toList();
     }
@@ -606,6 +608,8 @@ public class ProfileService {
                 .firstName(profile.getFirstName())
                 .lastName(profile.getLastName())
                 .career(profile.getCareer())
+                .headline(profile.getHeadline())
+                .avatarUrl(profile.getAvatarUrl())
                 .isInstitutionVerified(profile.getIsInstitutionVerified())
                 .build()
         ).toList();

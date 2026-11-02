@@ -12,5 +12,7 @@ public class PostulantDirectoryResponseDTO {
     private String firstName;
     private String lastName;
     private String career;
-    private Boolean isInstitutionVerified; 
+    private String headline;
+    private String avatarUrl;
+    private Boolean isInstitutionVerified;
 }
