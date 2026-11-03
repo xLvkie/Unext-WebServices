@@ -25,6 +25,7 @@ public class ProfileService {
     private final StudentSkillRepository studentSkillRepository;
     private final JobOfferRepository jobOfferRepository;
     private final MatchingService matchingService;
+    private final NotificationService notificationService;
 
     /* ====================================
     // Creación del perfil de los segmentos
@@ -197,6 +198,44 @@ public class ProfileService {
         return "Organización verificada exitosamente. Tu perfil ahora es visible públicamente.";
     }
 
+    // Agrega este método en ProfileService.java (debajo de verifyOrganization):
+    @Transactional
+    public String regenerateOrganizationOtp(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        String otpCode = String.format("%06d", new java.util.Random().nextInt(900000) + 100000);
+        String role = user.getRole().name();
+
+        if (role.equals("RECRUITER")) {
+            RecruiterProfile profile = recruiterRepository.findByUserId(user.getId())
+                    .orElseThrow(() -> new RuntimeException("Perfil de reclutador no encontrado"));
+            profile.setVerificationCode(otpCode);
+            recruiterRepository.save(profile);
+
+            notificationService.createNotification(
+                    user,
+                    "🔐 Código de Verificación Corporativa: " + otpCode,
+                    "Ingresa el código de seguridad " + otpCode + " en tu perfil para acreditar el RUC " + profile.getRuc() + "."
+            );
+        } else if (role.equals("INSTITUTION")) {
+            InstitutionProfile profile = institutionRepository.findByUserId(user.getId())
+                    .orElseThrow(() -> new RuntimeException("Perfil de institución no encontrado"));
+            profile.setVerificationCode(otpCode);
+            institutionRepository.save(profile);
+
+            notificationService.createNotification(
+                    user,
+                    "🔐 Código de Acreditación Institucional: " + otpCode,
+                    "Ingresa el código de seguridad " + otpCode + " en tu perfil para validar el dominio oficial @" + profile.getDomain() + "."
+            );
+        } else {
+            throw new RuntimeException("Rol no aplicable para código organizacional");
+        }
+
+        return otpCode;
+    }
+
     /* ============================================
     // Mostrar y editar datos del perfil postulante
     // ============================================ */
@@ -291,6 +330,13 @@ public class ProfileService {
         RecruiterProfile profile = recruiterRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new RuntimeException("HTTP 404: Perfil de reclutador no encontrado"));
 
+        if (!Boolean.TRUE.equals(profile.getIsVerified()) &&
+                (profile.getVerificationCode() == null || profile.getVerificationCode().isBlank())) {
+            String autoCode = String.format("%06d", new java.util.Random().nextInt(900000) + 100000);
+            profile.setVerificationCode(autoCode);
+            recruiterRepository.save(profile);
+        }
+
         return RecruiterProfileResponseDTO.builder()
                 .id(profile.getId())
                 .userId(profile.getUser().getId())
@@ -376,12 +422,20 @@ public class ProfileService {
     /* ============================================
     // Mostrar y editar datos del perfil intitucion
     // ============================================ */
+    @Transactional(readOnly = true)
     public InstitutionProfileResponseDTO getMyInstitutionProfile(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
         InstitutionProfile profile = institutionRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new RuntimeException("Perfil de institución no encontrado"));
+                .orElseThrow(() -> new RuntimeException("HTTP 404: Perfil de institución no encontrado"));
+
+        if (!Boolean.TRUE.equals(profile.getIsVerified()) &&
+                (profile.getVerificationCode() == null || profile.getVerificationCode().isBlank())) {
+            String autoCode = String.format("%06d", new java.util.Random().nextInt(900000) + 100000);
+            profile.setVerificationCode(autoCode);
+            institutionRepository.save(profile);
+        }
 
         return InstitutionProfileResponseDTO.builder()
                 .id(profile.getId())
@@ -389,7 +443,11 @@ public class ProfileService {
                 .name(profile.getName())
                 .domain(profile.getDomain())
                 .logoUrl(profile.getLogoUrl())
+                .bannerUrl(profile.getBannerUrl())
+                .bannerText(profile.getBannerText())
                 .description(profile.getDescription())
+                .isVerified(Boolean.TRUE.equals(profile.getIsVerified()))
+                .pendingVerificationCode(!Boolean.TRUE.equals(profile.getIsVerified()) ? profile.getVerificationCode() : null)
                 .build();
     }
 
@@ -401,9 +459,11 @@ public class ProfileService {
         InstitutionProfile profile = institutionRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new RuntimeException("Perfil de institución no encontrado"));
 
-        if (request.getName() != null) profile.setName(request.getName());
-        if (request.getDomain() != null) profile.setDomain(request.getDomain());
+        if (request.getName() != null && !request.getName().isBlank()) profile.setName(request.getName().trim());
+        if (request.getDomain() != null && !request.getDomain().isBlank()) profile.setDomain(request.getDomain().trim().toLowerCase());
         if (request.getLogoUrl() != null) profile.setLogoUrl(request.getLogoUrl());
+        if (request.getBannerUrl() != null) profile.setBannerUrl(request.getBannerUrl());
+        if (request.getBannerText() != null) profile.setBannerText(request.getBannerText());
         if (request.getDescription() != null) profile.setDescription(request.getDescription());
 
         institutionRepository.save(profile);
@@ -637,6 +697,7 @@ public class ProfileService {
     @Transactional(readOnly = true)
     public InstitutionProfileResponseDTO getInstitutionProfileById(UUID institutionId) {
         InstitutionProfile profile = institutionRepository.findByIdAndIsVerifiedTrue(institutionId)
+                .or(() -> institutionRepository.findByUserId(institutionId))
                 .orElseThrow(() -> new RuntimeException("HTTP 404: Perfil de institución no encontrado o pendiente de verificación"));
 
         return InstitutionProfileResponseDTO.builder()
@@ -645,7 +706,10 @@ public class ProfileService {
                 .name(profile.getName())
                 .domain(profile.getDomain())
                 .logoUrl(profile.getLogoUrl())
+                .bannerUrl(profile.getBannerUrl())
+                .bannerText(profile.getBannerText())
                 .description(profile.getDescription())
+                .isVerified(Boolean.TRUE.equals(profile.getIsVerified()))
                 .build();
     }
 

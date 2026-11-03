@@ -49,7 +49,7 @@ public class InternshipAgreement {
     @Column(name = "weekly_hours", nullable = false)
     private Integer weeklyHours;
 
-    @Column(name = "document_url")
+    @Column(name = "document_url", columnDefinition = "TEXT")
     private String documentUrl;
 
     @Enumerated(EnumType.STRING)

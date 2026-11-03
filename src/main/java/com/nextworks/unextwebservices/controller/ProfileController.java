@@ -87,6 +87,20 @@ public class ProfileController {
         return ResponseEntity.ok(profileService.verifyOrganization(user.getEmail(), request.getCode()));
     }
 
+    @PreAuthorize("hasAnyAuthority('RECRUITER', 'INSTITUTION')")
+    @PostMapping("/organization/resend-code")
+    public ResponseEntity<java.util.Map<String, String>> resendOrganizationCode(
+            Authentication authentication) {
+
+        User user = (User) authentication.getPrincipal();
+        assert user != null;
+        String newCode = profileService.regenerateOrganizationOtp(user.getEmail());
+        return ResponseEntity.ok(java.util.Map.of(
+                "message", "Se ha generado un nuevo código de seguridad y se envió a tu bandeja de notificaciones.",
+                "code", newCode
+        ));
+    }
+
     /* ========================
     ACTUALIZAR Y OBTENER PERFIL
     // ======================== */

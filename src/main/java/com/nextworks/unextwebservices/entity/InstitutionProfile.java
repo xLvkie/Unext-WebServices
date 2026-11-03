@@ -32,6 +32,12 @@ public class InstitutionProfile {
     @Column(name = "logo_url", columnDefinition = "TEXT")
     private String logoUrl;
 
+    @Column(name = "banner_url", columnDefinition = "TEXT")
+    private String bannerUrl;
+
+    @Column(name = "banner_text", length = 35)
+    private String bannerText;
+
     @Column(columnDefinition = "TEXT")
     private String description;
 

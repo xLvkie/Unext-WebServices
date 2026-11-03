@@ -27,4 +27,5 @@ public interface InternshipAgreementRepository extends JpaRepository<InternshipA
     boolean existsByInstitutionProfileIdAndRecruiterProfileIdAndStatus(UUID institutionProfileId, UUID recruiterProfileId, AgreementStatus status);
     Optional<InternshipAgreement> findByIdAndInstitutionProfileId(UUID id, UUID institutionProfileId);
     boolean existsByJobApplicationId(UUID jobApplicationId);
+    List<InternshipAgreement> findByRecruiterProfileIdOrderByCreatedAtDesc(UUID recruiterId);
 }

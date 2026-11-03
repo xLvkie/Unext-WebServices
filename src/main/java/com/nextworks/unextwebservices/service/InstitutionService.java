@@ -38,6 +38,7 @@ public class InstitutionService {
     private final RecruiterProfileRepository recruiterRepository;
     private final InternshipAgreementRepository agreementRepository;
     private final AcademicValidationRepository academicValidationRepository;
+    private final StudentSkillRepository studentSkillRepository;
 
     // Listar alumnos pendientes de validación
     @Transactional(readOnly = true)
@@ -373,18 +374,36 @@ public class InstitutionService {
             throw new RuntimeException("No tienes permisos para modificar esta validación.");
         }
 
-        validation.setStatus(ValidationStatus.valueOf(request.getStatus()));
+        ValidationStatus newStatus = ValidationStatus.valueOf(request.getStatus());
+        validation.setStatus(newStatus);
         if (request.getObservations() != null) {
             validation.setObservation(request.getObservations());
         }
-
         academicValidationRepository.save(validation);
+
+        // ACTUALIZAR LA HABILIDAD TÉCNICA DEL ESTUDIANTE (StudentSkill)
+        StudentSkill skill = validation.getTechnicalSkill();
+        if (skill != null) {
+            if (newStatus == ValidationStatus.APPROVED) {
+                skill.setIsValidatedByInstitution(true);
+                skill.setValidatedInstitutionName(institution.getName());
+                skill.setValidatedInstitutionLogoUrl(institution.getLogoUrl());
+            } else if (newStatus == ValidationStatus.REJECTED) {
+                skill.setIsValidatedByInstitution(false);
+                skill.setValidatedInstitutionName(null);
+                skill.setValidatedInstitutionLogoUrl(null);
+            }
+            studentSkillRepository.save(skill);
+        }
+
+        String obsText = (validation.getObservation() != null && !validation.getObservation().isBlank())
+                ? " Observaciones: " + validation.getObservation()
+                : "";
 
         String notifTitle = "Actualización de Habilidad";
         String notifContent = "Tu solicitud de validación académica para la habilidad '" +
                 validation.getTechnicalSkill().getName() + "' ha sido " +
-                (request.getStatus().equals("APPROVED") ? "APROBADA" : "RECHAZADA") + "." +
-                " " + validation.getObservation();
+                (newStatus == ValidationStatus.APPROVED ? "APROBADA" : "RECHAZADA") + "." + obsText;
         notificationService.createNotification(validation.getPostulantProfile().getUser(), notifTitle, notifContent);
 
         return "El estado de la validación se ha actualizado correctamente.";

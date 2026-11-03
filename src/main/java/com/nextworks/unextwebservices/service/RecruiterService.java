@@ -416,4 +416,31 @@ public class RecruiterService {
                 .createdAt(agreement.getCreatedAt()) // Asegúrate de que el @PrePersist de tu entidad le asigne valor
                 .build();
     }
+
+    @Transactional(readOnly = true)
+    public List<AgreementResponseDTO> getMyAgreements(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        RecruiterProfile recruiter = recruiterRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new RuntimeException("Perfil de reclutador no encontrado"));
+
+        return internshipAgreementRepository.findByRecruiterProfileIdOrderByCreatedAtDesc(recruiter.getId())
+                .stream()
+                .map(agreement -> AgreementResponseDTO.builder()
+                        .id(agreement.getId())
+                        .jobApplicationId(agreement.getJobApplication() != null ? agreement.getJobApplication().getId() : null)
+                        .title(agreement.getTitle())
+                        .companyName(recruiter.getCompanyName())
+                        .studentName(agreement.getPostulantProfile().getFirstName() + " " + agreement.getPostulantProfile().getLastName())
+                        .startDate(agreement.getStartDate())
+                        .endDate(agreement.getEndDate())
+                        .weeklyHours(agreement.getWeeklyHours())
+                        .documentUrl(agreement.getDocumentUrl())
+                        .status(agreement.getStatus())
+                        .observations(agreement.getObservations())
+                        .reviewedAt(agreement.getReviewedAt())
+                        .createdAt(agreement.getCreatedAt())
+                        .build())
+                .toList();
+    }
 }

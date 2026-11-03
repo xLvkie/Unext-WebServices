@@ -134,4 +134,12 @@ public class RecruiterController {
         assert user != null;
         return ResponseEntity.ok(recruiterService.createAgreement(user.getEmail(), request));
     }
+
+    @PreAuthorize("hasAuthority('RECRUITER')")
+    @GetMapping("/agreements")
+    public ResponseEntity<List<AgreementResponseDTO>> getMyAgreements(Authentication authentication) {
+        User user = (User) authentication.getPrincipal();
+        assert user != null;
+        return ResponseEntity.ok(recruiterService.getMyAgreements(user.getEmail()));
+    }
 }

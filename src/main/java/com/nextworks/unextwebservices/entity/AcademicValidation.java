@@ -31,7 +31,7 @@ public class AcademicValidation {
     @JoinColumn(name = "technical_skill_id", nullable = false)
     private StudentSkill technicalSkill;
 
-    @Column(name = "evidence_url", nullable = false)
+    @Column(name = "evidence_url", nullable = false, columnDefinition = "TEXT")
     private String evidenceUrl;
 
     @Column(columnDefinition = "TEXT")

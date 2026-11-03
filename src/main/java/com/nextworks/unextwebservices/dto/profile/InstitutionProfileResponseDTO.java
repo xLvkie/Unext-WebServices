@@ -4,8 +4,6 @@ import lombok.Builder;
 import lombok.Data;
 import java.util.UUID;
 
-// LO QUE SE VE POR PANTALLA (FRONTEND)
-
 @Data
 @Builder
 public class InstitutionProfileResponseDTO {
@@ -14,5 +12,9 @@ public class InstitutionProfileResponseDTO {
     private String name;
     private String domain;
     private String logoUrl;
+    private String bannerUrl;
+    private String bannerText;
     private String description;
+    private Boolean isVerified;
+    private String pendingVerificationCode;
 }
