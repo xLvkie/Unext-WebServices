@@ -100,19 +100,25 @@ public class ConnectionService {
 
         conn.setRequester(currentUser);
         conn.setAddressee(targetUser);
-        conn.setStatus(ConnectionStatus.PENDING);
+
+        boolean autoAccept = currentUser.getRole() == Role.RECRUITER
+                && targetUser.getRole() == Role.POSTULANT;
+
+        conn.setStatus(autoAccept ? ConnectionStatus.ACCEPTED : ConnectionStatus.PENDING);
         connectionRepository.save(conn);
 
         notificationService.createNotification(
                 targetUser,
-                "Nueva solicitud para conectar en tu red",
-                resolveDisplayName(currentUser) + " desea conectar contigo en Unext."
+                autoAccept ? "¡Nueva conexión corporativa!" : "Nueva solicitud para conectar en tu red",
+                autoAccept
+                        ? resolveDisplayName(currentUser) + " se ha conectado contigo para conversar por mensajería."
+                        : resolveDisplayName(currentUser) + " desea conectar contigo en Unext."
         );
 
         return ConnectionStatusResponseDTO.builder()
                 .connectionId(conn.getId())
                 .targetUserId(targetUserId)
-                .status("PENDING_SENT")
+                .status(autoAccept ? "CONNECTED" : "PENDING_SENT")
                 .canConnect(true)
                 .build();
     }

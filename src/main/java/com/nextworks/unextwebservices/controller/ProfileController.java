@@ -287,4 +287,11 @@ public class ProfileController {
         Devuelve el perfil detallado de una institución específico (Vista de "Ver Perfil").
         */
     }
+
+    @PreAuthorize("hasAnyAuthority('RECRUITER', 'INSTITUTION', 'POSTULANT')")
+    @GetMapping("/recruiters/directory/{recruiterId}/jobs")
+    public ResponseEntity<List<com.nextworks.unextwebservices.dto.job.JobOfferResponseDTO>> getPublicRecruiterJobs(
+            @PathVariable UUID recruiterId) {
+        return ResponseEntity.ok(profileService.getPublicJobsByRecruiter(recruiterId));
+    }
 }

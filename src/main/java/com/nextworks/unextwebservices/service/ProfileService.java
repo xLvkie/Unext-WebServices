@@ -23,6 +23,8 @@ public class ProfileService {
     private final RecruiterProfileRepository recruiterRepository;
     private final InstitutionProfileRepository institutionRepository;
     private final StudentSkillRepository studentSkillRepository;
+    private final JobOfferRepository jobOfferRepository;
+    private final MatchingService matchingService;
 
     /* ====================================
     // Creación del perfil de los segmentos
@@ -645,5 +647,18 @@ public class ProfileService {
                 .logoUrl(profile.getLogoUrl())
                 .description(profile.getDescription())
                 .build();
+    }
+
+    @Transactional(readOnly = true)
+    public List<com.nextworks.unextwebservices.dto.job.JobOfferResponseDTO> getPublicJobsByRecruiter(UUID recruiterId) {
+        RecruiterProfile profile = recruiterRepository.findByIdAndIsVerifiedTrue(recruiterId)
+                .or(() -> recruiterRepository.findByUserId(recruiterId))
+                .orElseThrow(() -> new RuntimeException("HTTP 404: Empresa no encontrada"));
+
+        return jobOfferRepository.findByRecruiterProfileIdOrderByCreatedAtDesc(profile.getId())
+                .stream()
+                .filter(job -> Boolean.TRUE.equals(job.getIsActive()))
+                .map(matchingService::toOfferDto)
+                .toList();
     }
 }
