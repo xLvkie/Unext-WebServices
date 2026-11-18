@@ -3,17 +3,16 @@ package com.nextworks.unextwebservices.service;
 import com.nextworks.unextwebservices.dto.agreement.AgreementResponseDTO;
 import com.nextworks.unextwebservices.dto.agreement.AgreementUpdateRequestDTO;
 import com.nextworks.unextwebservices.dto.dashboard.DashboardStatsResponseDTO;
+import com.nextworks.unextwebservices.dto.dashboard.DashboardSummaryResponseDTO;
 import com.nextworks.unextwebservices.dto.validation.EndorsedCompanyResponseDTO;
 import com.nextworks.unextwebservices.dto.validation.PendingStudentResponseDTO;
 import com.nextworks.unextwebservices.dto.validation.PendingValidationResponseDTO;
 import com.nextworks.unextwebservices.dto.validation.ValidationUpdateDTO;
 import com.nextworks.unextwebservices.entity.*;
 import com.nextworks.unextwebservices.entity.enums.AgreementStatus;
-import com.nextworks.unextwebservices.entity.enums.ApplicationStatus;
 import com.nextworks.unextwebservices.entity.enums.ValidationStatus;
 import com.nextworks.unextwebservices.repository.*;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +20,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 @Service
@@ -29,6 +29,9 @@ public class InstitutionService {
 
     // Numero minimo de instituciones que deben acreditar activamente a una empresa para que obtenga la insignia
     private static final int ACCREDITATION_THRESHOLD = 1;
+
+    public static final String DASHBOARD_EMPTY = DashboardService.NO_DATA_MESSAGE;
+    public static final String DASHBOARD_DB_ERROR = DashboardService.DB_ERROR_MESSAGE;
 
     private final InstitutionProfileRepository institutionRepository;
     private final PostulantProfileRepository postulantRepository;
@@ -39,14 +42,12 @@ public class InstitutionService {
     private final InternshipAgreementRepository agreementRepository;
     private final AcademicValidationRepository academicValidationRepository;
     private final StudentSkillRepository studentSkillRepository;
+    private final DashboardService dashboardService;
 
     // Listar alumnos pendientes de validación
     @Transactional(readOnly = true)
     public List<PendingStudentResponseDTO> getPendingStudents(String email) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        InstitutionProfile institution = institutionRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new RuntimeException("Perfil de institución no encontrado"));
+        InstitutionProfile institution = findInstitutionByEmail(email);
 
         List<PostulantProfile> pendingStudents = postulantRepository
                 .findByInstitutionProfileIdAndIsInstitutionVerifiedFalse(institution.getId());
@@ -65,51 +66,41 @@ public class InstitutionService {
     // Aprobar o desaprobar el perfil del alumno
     @Transactional
     public String updateStudentAssociation(String email, UUID postulantId, ValidationStatus status) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-
-        InstitutionProfile institution = institutionRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new RuntimeException("Perfil de institución no encontrado"));
+        InstitutionProfile institution = findInstitutionByEmail(email);
 
         PostulantProfile postulant = postulantRepository.findById(postulantId)
-                .orElseThrow(() -> new RuntimeException("Postulante no encontrado"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Postulante no encontrado"));
 
         if (postulant.getInstitutionProfile() == null ||
                 !postulant.getInstitutionProfile().getId().equals(institution.getId())) {
-            throw new RuntimeException("HTTP 403: Este estudiante no pertenece a tu institución.");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Este estudiante no pertenece a tu institución.");
         }
 
-        String notifTitle = "";
-        String notifContent = "";
-        String responseMessage = "";
+        String notifTitle;
+        String notifContent;
+        String responseMessage;
 
         switch (status) {
-            case APPROVED:
+            case APPROVED -> {
                 postulant.setIsInstitutionVerified(true);
-
                 notifTitle = "Perfil Académico Oficializado";
                 notifContent = "Tu casa de estudios ha verificado oficialmente tu perfil. Ahora destacarás ante los reclutadores.";
                 responseMessage = "El estudiante ha sido verificado exitosamente.";
-                break;
-
-            case REJECTED:
+            }
+            case REJECTED -> {
                 postulant.setIsInstitutionVerified(false);
                 postulant.setInstitutionProfile(null);
-
                 notifTitle = "Asociación Académica Rechazada";
                 notifContent = "La institución no ha podido verificar tus datos. Por favor, revisa tu información e intenta vincularte nuevamente.";
                 responseMessage = "La solicitud del estudiante ha sido rechazada.";
-                break;
-
-            default:
-                throw new RuntimeException("HTTP 400: Acción no permitida. El estado debe ser APPROVED o REJECTED.");
+            }
+            default -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Acción no permitida. El estado debe ser APPROVED o REJECTED.");
         }
 
         postulantRepository.save(postulant);
-
-        if (!notifTitle.isEmpty()) {
-            notificationService.createNotification(postulant.getUser(), notifTitle, notifContent);
-        }
+        notificationService.createNotification(postulant.getUser(), notifTitle, notifContent);
 
         return responseMessage;
     }
@@ -117,10 +108,7 @@ public class InstitutionService {
     // Otorgar Insignia a una Empresa: solo si la institucion tiene al menos un convenio APPROVED con ella
     @Transactional
     public String endorseCompany(String email, UUID recruiterId) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        InstitutionProfile institution = institutionRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new RuntimeException("Perfil de institución no encontrado"));
+        InstitutionProfile institution = findInstitutionByEmail(email);
 
         RecruiterProfile recruiter = recruiterRepository.findById(recruiterId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Empresa no encontrada"));
@@ -170,10 +158,7 @@ public class InstitutionService {
     // Retirar Insignia a una Empresa (exige motivo, no borra la fila)
     @Transactional
     public String removeEndorsement(String email, UUID recruiterId, String reason) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        InstitutionProfile institution = institutionRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new RuntimeException("Perfil de institución no encontrado"));
+        InstitutionProfile institution = findInstitutionByEmail(email);
 
         InstitutionEndorsement endorsement = endorsementRepository
                 .findByInstitutionProfileIdAndRecruiterProfileId(institution.getId(), recruiterId)
@@ -197,10 +182,7 @@ public class InstitutionService {
     // Listar Empresas Aliadas (solo acreditaciones activas)
     @Transactional(readOnly = true)
     public List<EndorsedCompanyResponseDTO> getEndorsedCompanies(String email) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        InstitutionProfile institution = institutionRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new RuntimeException("Perfil de institución no encontrado"));
+        InstitutionProfile institution = findInstitutionByEmail(email);
 
         return endorsementRepository.findByInstitutionProfileIdAndRevokedAtIsNull(institution.getId())
                 .stream()
@@ -215,10 +197,7 @@ public class InstitutionService {
     // Listar Convenios de Prácticas
     @Transactional(readOnly = true)
     public List<AgreementResponseDTO> getAgreements(String email, AgreementStatus status) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        InstitutionProfile institution = institutionRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new RuntimeException("Perfil de institución no encontrado"));
+        InstitutionProfile institution = findInstitutionByEmail(email);
 
         List<InternshipAgreement> agreements;
         if (status != null) {
@@ -233,10 +212,7 @@ public class InstitutionService {
     // Actualizar Estado del Convenio
     @Transactional
     public AgreementResponseDTO updateAgreementStatus(String email, UUID agreementId, AgreementUpdateRequestDTO request) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        InstitutionProfile institution = institutionRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new RuntimeException("Perfil de institución no encontrado"));
+        InstitutionProfile institution = findInstitutionByEmail(email);
 
         // Si el convenio es de otra institución, no se revela que existe (404)
         InternshipAgreement agreement = agreementRepository.findByIdAndInstitutionProfileId(agreementId, institution.getId())
@@ -278,13 +254,13 @@ public class InstitutionService {
         return mapAgreementToDTO(agreement);
     }
 
-    private AgreementResponseDTO mapAgreementToDTO(InternshipAgreement a) {
+    public AgreementResponseDTO mapAgreementToDTO(InternshipAgreement a) {
         return AgreementResponseDTO.builder()
                 .id(a.getId())
                 .jobApplicationId(a.getJobApplication() != null ? a.getJobApplication().getId() : null)
                 .title(a.getTitle())
                 .companyName(a.getRecruiterProfile().getCompanyName())
-                .studentName(a.getPostulantProfile().getFirstName() + " " + a.getPostulantProfile().getLastName())
+                .studentName((a.getPostulantProfile().getFirstName() + " " + a.getPostulantProfile().getLastName()).trim())
                 .startDate(a.getStartDate())
                 .endDate(a.getEndDate())
                 .weeklyHours(a.getWeeklyHours())
@@ -296,54 +272,28 @@ public class InstitutionService {
                 .build();
     }
 
-    public static final String DASHBOARD_EMPTY = "No hay datos suficientes para el filtro seleccionado";
-    public static final String DASHBOARD_DB_ERROR = "Error al cargar las métricas. Por favor, intente de nuevo en unos minutos";
-
-    // Obtener Estadísticas del Dashboard
+    // Obtener Estadísticas del Dashboard (reutiliza cálculo consolidado de DashboardService)
     @Transactional(readOnly = true)
     public DashboardStatsResponseDTO getDashboardStats(String email, String career) {
-        try {
-            User user = userRepository.findByEmail(email)
-                    .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-            InstitutionProfile institution = institutionRepository.findByUserId(user.getId())
-                    .orElseThrow(() -> new RuntimeException("Perfil de institución no encontrado"));
-
-            UUID instId = institution.getId();
-            String careerFilter = career == null ? "" : career.trim().toLowerCase();
-
-            if (!careerFilter.isEmpty()
-                    && postulantRepository.countStudentsByInstitutionAndCareer(instId, careerFilter) == 0) {
-                throw new RuntimeException(DASHBOARD_EMPTY);
-            }
-
-            long verifiedStudents = postulantRepository.countVerifiedByInstitutionAndCareer(instId, careerFilter);
-            long hiredStudents = postulantRepository.countHiredByInstitutionAndCareer(
-                    instId, careerFilter, ApplicationStatus.ACCEPTED);
-            long activeAgreements = agreementRepository.countByInstitutionAndStatusAndCareer(
-                    instId, AgreementStatus.APPROVED, careerFilter);
-            long endorsedCompanies = endorsementRepository.countByInstitutionProfileIdAndRevokedAtIsNull(instId);
-            double rate = verifiedStudents > 0 ? ((double) hiredStudents / verifiedStudents) * 100 : 0.0;
-
-            return DashboardStatsResponseDTO.builder()
-                    .totalVerifiedStudents(verifiedStudents)
-                    .totalHiredStudents(hiredStudents)
-                    .totalActiveAgreements(activeAgreements)
-                    .totalEndorsedCompanies(endorsedCompanies)
-                    .employabilityRate(Math.round(rate * 100.0) / 100.0)
-                    .career(careerFilter.isEmpty() ? null : career.trim())
-                    .build();
-        } catch (DataAccessException ex) {
-            throw new RuntimeException(DASHBOARD_DB_ERROR);
+        DashboardSummaryResponseDTO summary = dashboardService.getSummary(email, career);
+        if (summary.getMessage() != null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, summary.getMessage());
         }
+
+        return DashboardStatsResponseDTO.builder()
+                .totalVerifiedStudents(summary.getTotalVerifiedStudents())
+                .totalHiredStudents(summary.getTotalHiredStudents())
+                .totalActiveAgreements(summary.getTotalActiveAgreements())
+                .totalEndorsedCompanies(summary.getTotalEndorsedCompanies())
+                .employabilityRate(summary.getEmployabilityRate())
+                .career(summary.getCareer())
+                .build();
     }
 
     // Listar validaciones de habilidades pendientes
     @Transactional(readOnly = true)
     public List<PendingValidationResponseDTO> getPendingSkillValidations(String email) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        InstitutionProfile institution = institutionRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new RuntimeException("Perfil de institución no encontrado"));
+        InstitutionProfile institution = findInstitutionByEmail(email);
 
         List<AcademicValidation> pendingValidations = academicValidationRepository
                 .findByInstitutionProfileIdAndStatus(institution.getId(), ValidationStatus.PENDING);
@@ -351,7 +301,7 @@ public class InstitutionService {
         return pendingValidations.stream()
                 .map(v -> PendingValidationResponseDTO.builder()
                         .validationId(v.getId())
-                        .studentName(v.getPostulantProfile().getFirstName() + " " + v.getPostulantProfile().getLastName())
+                        .studentName((v.getPostulantProfile().getFirstName() + " " + v.getPostulantProfile().getLastName()).trim())
                         .skillName(v.getTechnicalSkill().getName())
                         .evidenceUrl(v.getEvidenceUrl())
                         .status(v.getStatus().name())
@@ -362,19 +312,31 @@ public class InstitutionService {
     // Aprobar o Rechazar la validación y notificar al alumno
     @Transactional
     public String updateSkillValidationStatus(String email, UUID validationId, ValidationUpdateDTO request) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        InstitutionProfile institution = institutionRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new RuntimeException("Perfil de institución no encontrado"));
+        InstitutionProfile institution = findInstitutionByEmail(email);
 
         AcademicValidation validation = academicValidationRepository.findById(validationId)
-                .orElseThrow(() -> new RuntimeException("Validación no encontrada"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Validación no encontrada"));
 
         if (!validation.getInstitutionProfile().getId().equals(institution.getId())) {
-            throw new RuntimeException("No tienes permisos para modificar esta validación.");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes permisos para modificar esta validación.");
         }
 
-        ValidationStatus newStatus = ValidationStatus.valueOf(request.getStatus());
+        ValidationStatus newStatus;
+        try {
+            if (request.getStatus() == null || request.getStatus().isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El estado es obligatorio");
+            }
+            newStatus = ValidationStatus.valueOf(request.getStatus().trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Estado inválido. El estado debe ser APPROVED o REJECTED.");
+        }
+
+        if (newStatus != ValidationStatus.APPROVED && newStatus != ValidationStatus.REJECTED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Acción no permitida. El estado debe ser APPROVED o REJECTED.");
+        }
+
         validation.setStatus(newStatus);
         if (request.getObservations() != null) {
             validation.setObservation(request.getObservations());
@@ -388,7 +350,7 @@ public class InstitutionService {
                 skill.setIsValidatedByInstitution(true);
                 skill.setValidatedInstitutionName(institution.getName());
                 skill.setValidatedInstitutionLogoUrl(institution.getLogoUrl());
-            } else if (newStatus == ValidationStatus.REJECTED) {
+            } else {
                 skill.setIsValidatedByInstitution(false);
                 skill.setValidatedInstitutionName(null);
                 skill.setValidatedInstitutionLogoUrl(null);
@@ -400,12 +362,20 @@ public class InstitutionService {
                 ? " Observaciones: " + validation.getObservation()
                 : "";
 
+        String skillName = skill != null ? skill.getName() : "Habilidad";
         String notifTitle = "Actualización de Habilidad";
         String notifContent = "Tu solicitud de validación académica para la habilidad '" +
-                validation.getTechnicalSkill().getName() + "' ha sido " +
+                skillName + "' ha sido " +
                 (newStatus == ValidationStatus.APPROVED ? "APROBADA" : "RECHAZADA") + "." + obsText;
         notificationService.createNotification(validation.getPostulantProfile().getUser(), notifTitle, notifContent);
 
         return "El estado de la validación se ha actualizado correctamente.";
+    }
+
+    private InstitutionProfile findInstitutionByEmail(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
+        return institutionRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Perfil de institución no encontrado"));
     }
 }

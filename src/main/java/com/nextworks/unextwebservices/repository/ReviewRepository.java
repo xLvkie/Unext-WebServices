@@ -14,7 +14,4 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
     Optional<Review> findByInternshipAgreementIdAndRecruiterProfileId(UUID agreementId, UUID recruiterProfileId);
 
     List<Review> findByPostulantProfileIdAndStatusOrderByCreatedAtDesc(UUID postulantProfileId, ReviewStatus status);
-
-    List<Review> findByPostulantProfileIdAndStatusAndStarsOrderByCreatedAtDesc(
-            UUID postulantProfileId, ReviewStatus status, Integer stars);
 }

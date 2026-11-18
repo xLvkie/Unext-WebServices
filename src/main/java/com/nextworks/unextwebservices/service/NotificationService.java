@@ -6,8 +6,10 @@ import com.nextworks.unextwebservices.entity.User;
 import com.nextworks.unextwebservices.repository.NotificationRepository;
 import com.nextworks.unextwebservices.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.UUID;
@@ -33,8 +35,7 @@ public class NotificationService {
 
     @Transactional(readOnly = true)
     public List<NotificationResponseDTO> getMyNotifications(String email) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        User user = findUserByEmail(email);
 
         return notificationRepository.findByUserIdOrderByCreatedAtDesc(user.getId())
                 .stream()
@@ -44,14 +45,13 @@ public class NotificationService {
 
     @Transactional
     public NotificationResponseDTO markAsRead(String email, UUID notificationId) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        User user = findUserByEmail(email);
 
         Notification notification = notificationRepository.findById(notificationId)
-                .orElseThrow(() -> new RuntimeException("Notificación no encontrada"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Notificación no encontrada"));
 
         if (!notification.getUser().getId().equals(user.getId())) {
-            throw new RuntimeException("No tienes permiso para modificar esta notificación");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes permiso para modificar esta notificación");
         }
 
         notification.setIsRead(true);
@@ -62,8 +62,7 @@ public class NotificationService {
 
     @Transactional
     public void markAllAsRead(String email) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        User user = findUserByEmail(email);
 
         List<Notification> unread = notificationRepository.findByUserIdAndIsReadFalse(user.getId());
         if (!unread.isEmpty()) {
@@ -74,17 +73,21 @@ public class NotificationService {
 
     @Transactional
     public void deleteNotification(String email, UUID notificationId) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        User user = findUserByEmail(email);
 
         Notification notification = notificationRepository.findById(notificationId)
-                .orElseThrow(() -> new RuntimeException("Notificación no encontrada"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Notificación no encontrada"));
 
         if (!notification.getUser().getId().equals(user.getId())) {
-            throw new RuntimeException("No tienes permiso para eliminar esta notificación");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes permiso para eliminar esta notificación");
         }
 
         notificationRepository.delete(notification);
+    }
+
+    private User findUserByEmail(String email) {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
     }
 
     private NotificationResponseDTO mapToDTO(Notification notification) {

@@ -6,13 +6,15 @@ import com.nextworks.unextwebservices.entity.*;
 import com.nextworks.unextwebservices.entity.enums.ApplicationStatus;
 import com.nextworks.unextwebservices.entity.enums.ChatContext;
 import com.nextworks.unextwebservices.entity.enums.ConnectionStatus;
+import com.nextworks.unextwebservices.entity.enums.Role;
 import com.nextworks.unextwebservices.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -29,19 +31,16 @@ public class ChatService {
     @Transactional
     public MessageResponseDTO sendMessage(String email, MessageRequestDTO request) {
         User sender = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Remitente no encontrado"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Remitente no encontrado"));
 
         User receiver = userRepository.findById(request.getReceiverId())
-                .orElseThrow(() -> new RuntimeException("Destinatario no encontrado"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Destinatario no encontrado"));
 
         JobApplication application = null;
         if (request.getJobApplicationId() != null) {
             application = applicationRepository.findById(request.getJobApplicationId())
-                    .orElseThrow(() -> new RuntimeException("Postulación no encontrada"));
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Postulación no encontrada"));
         }
-
-        String senderRole = sender.getRole().name();
-        String receiverRole = receiver.getRole().name();
 
         // Verificamos si ambos usuarios ya tienen una conexión ACCEPTED en Mi Red
         boolean isAlreadyConnected = connectionRepository
@@ -55,13 +54,13 @@ public class ChatService {
                 .isEmpty();
 
         // Validación al segmento POSTULANTE
-        if (senderRole.equals("POSTULANT")) {
+        if (sender.getRole() == Role.POSTULANT) {
             // Caso 1: Postulante -> Reclutador
-            if (receiverRole.equals("RECRUITER")) {
+            if (receiver.getRole() == Role.RECRUITER) {
                 PostulantProfile postulant = postulantRepository.findByUserId(sender.getId())
-                        .orElseThrow(() -> new RuntimeException("Perfil de postulante no encontrado"));
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Perfil de postulante no encontrado"));
                 RecruiterProfile recruiter = recruiterRepository.findByUserId(receiver.getId())
-                        .orElseThrow(() -> new RuntimeException("Perfil de empresa no encontrado"));
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Perfil de empresa no encontrado"));
 
                 // Si no enviaron jobApplicationId desde el frontend, buscamos automáticamente su postulación con esta empresa
                 if (application == null) {
@@ -87,23 +86,27 @@ public class ChatService {
                                 application.getStatus() == ApplicationStatus.ACCEPTED);
 
                 if (!isAlreadyConnected && !hasPreviousConversation && !hasValidApplicationStage) {
-                    throw new RuntimeException("HTTP 403: Para enviar mensajes a esta empresa, tu postulación debe estar en etapa de evaluación o el reclutador debe haber habilitado el chat.");
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                            "Para enviar mensajes a esta empresa, tu postulación debe estar en etapa de evaluación o el reclutador debe haber habilitado el chat.");
                 }
             }
             // Caso 2: Postulante -> Institución
-            else if (receiverRole.equals("INSTITUTION")) {
+            else if (receiver.getRole() == Role.INSTITUTION) {
                 PostulantProfile postulant = postulantRepository.findByUserId(sender.getId())
-                        .orElseThrow(() -> new RuntimeException("Perfil de postulante no encontrado"));
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Perfil de postulante no encontrado"));
 
                 if (!isAlreadyConnected && !hasPreviousConversation) {
                     if (postulant.getInstitutionProfile() == null) {
-                        throw new RuntimeException("HTTP 403: No puedes contactar a esta institución porque no tienes un vínculo académico registrado.");
+                        throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                                "No puedes contactar a esta institución porque no tienes un vínculo académico registrado.");
                     }
                     if (!postulant.getInstitutionProfile().getUser().getId().equals(receiver.getId())) {
-                        throw new RuntimeException("HTTP 403: Solo puedes comunicarte con tu propia institución.");
+                        throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                                "Solo puedes comunicarte con tu propia institución.");
                     }
                     if (!Boolean.TRUE.equals(postulant.getIsInstitutionVerified())) {
-                        throw new RuntimeException("HTTP 403: Tu vínculo académico aún está en revisión. Espera la aprobación para usar el chat.");
+                        throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                                "Tu vínculo académico aún está en revisión. Espera la aprobación para usar el chat.");
                     }
                 }
             }
@@ -127,7 +130,7 @@ public class ChatService {
     @Transactional(readOnly = true)
     public List<MessageResponseDTO> getInbox(String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
 
         List<Message> inboxMessages = messageRepository.findInboxForUser(user.getId());
 
@@ -137,13 +140,13 @@ public class ChatService {
     @Transactional
     public List<MessageResponseDTO> getChatHistory(String email, UUID receiverId) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
         List<Message> history = messageRepository.findChatHistory(user.getId(), receiverId);
 
         boolean hasUnreadMessages = false;
 
         for (Message message : history) {
-            if (message.getReceiver().getId().equals(user.getId()) && !message.getIsRead()) {
+            if (message.getReceiver().getId().equals(user.getId()) && !Boolean.TRUE.equals(message.getIsRead())) {
                 message.setIsRead(true);
                 hasUnreadMessages = true;
             }

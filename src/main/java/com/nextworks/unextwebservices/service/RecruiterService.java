@@ -2,7 +2,6 @@ package com.nextworks.unextwebservices.service;
 
 import com.nextworks.unextwebservices.dto.agreement.AgreementCreateRequestDTO;
 import com.nextworks.unextwebservices.dto.agreement.AgreementResponseDTO;
-import com.nextworks.unextwebservices.dto.directory.RecruiterDirectoryResponseDTO;
 import com.nextworks.unextwebservices.dto.job.JobOfferRequestDTO;
 import com.nextworks.unextwebservices.dto.job.JobOfferResponseDTO;
 import com.nextworks.unextwebservices.dto.job.JobOfferUpdateDTO;
@@ -30,25 +29,22 @@ public class RecruiterService {
     private final UserRepository userRepository;
     private final RecruiterProfileRepository recruiterRepository;
     private final PostulantProfileRepository postulantRepository;
-    private final InstitutionProfileRepository institutionRepository;
     private final InternshipAgreementRepository internshipAgreementRepository;
     private final NotificationService notificationService;
     private final MatchingService matchingService;
     private final ReviewService reviewService;
+    private final InstitutionService institutionService;
 
     /* ====================================
     // Creación de nueva vacante
     // ==================================== */
     @Transactional
     public JobOfferResponseDTO createJobOffer(String email, JobOfferRequestDTO request) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-
-        RecruiterProfile profile = recruiterRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new RuntimeException("Perfil de reclutador no encontrado"));
+        RecruiterProfile profile = findRecruiterByEmail(email);
 
         if (!Boolean.TRUE.equals(profile.getIsVerified())) {
-            throw new RuntimeException("HTTP 403: Debes verificar tu cuenta corporativa antes de realizar esta acción");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Debes verificar tu cuenta corporativa antes de realizar esta acción");
         }
 
         JobOffer offer = JobOffer.builder()
@@ -77,17 +73,14 @@ public class RecruiterService {
     // ==================================== */
     @Transactional
     public String updateApplicationStatus(String email, UUID applicationId, ApplicationStatus newStatus) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-
-        RecruiterProfile profile = recruiterRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new RuntimeException("Perfil de reclutador no encontrado"));
+        RecruiterProfile profile = findRecruiterByEmail(email);
 
         JobApplication application = applicationRepository.findById(applicationId)
-                .orElseThrow(() -> new RuntimeException("Postulación no encontrada"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Postulación no encontrada"));
 
         if (!application.getJobOffer().getRecruiterProfile().getId().equals(profile.getId())) {
-            throw new RuntimeException("No tienes permiso para modificar esta postulación");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "No tienes permiso para modificar esta postulación");
         }
 
         application.setStatus(newStatus);
@@ -100,20 +93,20 @@ public class RecruiterService {
         String notifContent = "";
 
         switch (newStatus) {
-            case UNDER_REVIEW:
+            case UNDER_REVIEW -> {
                 notifTitle = "¡Avanzaste en el proceso!";
                 notifContent = "Tu postulación para '" + jobTitle + "' está siendo revisada. ¡El chat ha sido habilitado!";
-                break;
-            case ACCEPTED:
+            }
+            case ACCEPTED -> {
                 notifTitle = "¡Felicidades, fuiste aceptado!";
                 notifContent = "Has sido seleccionado para la vacante de '" + jobTitle + "'.";
-                break;
-            case REJECTED:
+            }
+            case REJECTED -> {
                 notifTitle = "Actualización de tu postulación";
                 notifContent = "El proceso para '" + jobTitle + "' ha concluido. No fuiste seleccionado esta vez.";
-                break;
-            default:
-                break;
+            }
+            default -> {
+            }
         }
 
         if (!notifTitle.isEmpty()) {
@@ -123,22 +116,17 @@ public class RecruiterService {
         return "Estado actualizado a " + newStatus.name() + " exitosamente.";
     }
 
-    private JobOfferResponseDTO mapToDTO(JobOffer offer) {
-        return matchingService.toOfferDto(offer);
-    }
-
     /* ============================================
     // Obtener, Mas info, Editar vacante de empresa
     // ============================================ */
     @Transactional(readOnly = true)
     public List<JobOfferResponseDTO> getMyJobOffers(String email) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        RecruiterProfile profile = recruiterRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new RuntimeException("Perfil no encontrado"));
+        RecruiterProfile profile = findRecruiterByEmail(email);
 
         return jobOfferRepository.findByRecruiterProfileIdOrderByCreatedAtDesc(profile.getId())
-                .stream().map(this::mapToDTO).toList();
+                .stream()
+                .map(matchingService::toOfferDto)
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -150,15 +138,12 @@ public class RecruiterService {
             String skill,
             Double minRating,
             Integer minReviews) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        RecruiterProfile profile = recruiterRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new RuntimeException("Perfil no encontrado"));
+        RecruiterProfile profile = findRecruiterByEmail(email);
         JobOffer offer = jobOfferRepository.findById(jobId)
-                .orElseThrow(() -> new RuntimeException("Vacante no encontrada"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Vacante no encontrada"));
 
         if (!offer.getRecruiterProfile().getId().equals(profile.getId())) {
-            throw new RuntimeException("No tienes permiso para ver esta vacante");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes permiso para ver esta vacante");
         }
 
         List<String> requiredSkills = matchingService.requiredSkillNames(offer);
@@ -205,13 +190,13 @@ public class RecruiterService {
 
         if (results.isEmpty() && (hasAcademicFilters || hasReputationFilters)) {
             if (hasReputationFilters && !hasAcademicFilters) {
-                throw new RuntimeException(ReviewService.WIDEN_REPUTATION);
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, ReviewService.WIDEN_REPUTATION);
             }
             if (hasReputationFilters) {
-                throw new RuntimeException(
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "No se encontraron candidatos que coincidan con estos criterios académicos y de reputación. Amplía los filtros.");
             }
-            throw new RuntimeException(MatchingService.NO_CANDIDATES_MESSAGE);
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, MatchingService.NO_CANDIDATES_MESSAGE);
         }
         return results;
     }
@@ -256,15 +241,12 @@ public class RecruiterService {
 
     @Transactional
     public JobOfferResponseDTO updateJobOffer(String email, UUID jobId, JobOfferUpdateDTO request) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        RecruiterProfile profile = recruiterRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new RuntimeException("Perfil no encontrado"));
+        RecruiterProfile profile = findRecruiterByEmail(email);
         JobOffer offer = jobOfferRepository.findById(jobId)
-                .orElseThrow(() -> new RuntimeException("Vacante no encontrada"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Vacante no encontrada"));
 
         if (!offer.getRecruiterProfile().getId().equals(profile.getId())) {
-            throw new RuntimeException("No puedes editar una vacante que no te pertenece");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No puedes editar una vacante que no te pertenece");
         }
 
         if (request.getTitle() != null && !request.getTitle().isBlank()) {
@@ -297,7 +279,6 @@ public class RecruiterService {
 
         jobOfferRepository.save(offer);
 
-
         List<JobApplication> applications = applicationRepository.findByJobOfferIdOrderByCreatedAtDesc(jobId);
         for (JobApplication app : applications) {
             if (app.getStatus() == ApplicationStatus.RECEIVED || app.getStatus() == ApplicationStatus.UNDER_REVIEW) {
@@ -307,28 +288,25 @@ public class RecruiterService {
             }
         }
 
-        return mapToDTO(offer);
+        return matchingService.toOfferDto(offer);
     }
 
     @Transactional
     public JobOfferResponseDTO closeJobOffer(String email, UUID jobId) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        RecruiterProfile profile = recruiterRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new RuntimeException("Perfil no encontrado"));
+        RecruiterProfile profile = findRecruiterByEmail(email);
         JobOffer offer = jobOfferRepository.findById(jobId)
-                .orElseThrow(() -> new RuntimeException("Vacante no encontrada"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Vacante no encontrada"));
 
         if (!offer.getRecruiterProfile().getId().equals(profile.getId())) {
-            throw new RuntimeException("No puedes cerrar una vacante que no te pertenece");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No puedes cerrar una vacante que no te pertenece");
         }
         if (!Boolean.TRUE.equals(offer.getIsActive())) {
-            throw new RuntimeException("Esta vacante ya está cerrada");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Esta vacante ya está cerrada");
         }
 
         offer.setIsActive(false);
         jobOfferRepository.save(offer);
-        return mapToDTO(offer);
+        return matchingService.toOfferDto(offer);
     }
 
     /* ==============================================
@@ -336,23 +314,19 @@ public class RecruiterService {
     // ============================================== */
     @Transactional
     public AgreementResponseDTO createAgreement(String email, AgreementCreateRequestDTO request) {
-        // Identificar a la Empresa que hace la solicitud
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        RecruiterProfile recruiter = recruiterRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new RuntimeException("Perfil de reclutador no encontrado"));
+        RecruiterProfile recruiter = findRecruiterByEmail(email);
 
         if (!Boolean.TRUE.equals(recruiter.getIsVerified())) {
-            throw new RuntimeException("HTTP 403: Debes verificar tu cuenta corporativa antes de realizar esta acción");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Debes verificar tu cuenta corporativa antes de realizar esta acción");
         }
 
-        // Identificar al Alumno
         PostulantProfile postulant = postulantRepository.findById(request.getPostulantId())
-                .orElseThrow(() -> new RuntimeException("Postulante no encontrado"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Postulante no encontrado"));
 
-        // Validar que el alumno tenga el respaldo de una Institución
-        if (postulant.getInstitutionProfile() == null || !postulant.getIsInstitutionVerified()) {
-            throw new RuntimeException("HTTP 400: No se puede crear un convenio institucional porque el estudiante no está verificado por ninguna universidad.");
+        if (postulant.getInstitutionProfile() == null || !Boolean.TRUE.equals(postulant.getIsInstitutionVerified())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "No se puede crear un convenio institucional porque el estudiante no está verificado por ninguna universidad.");
         }
 
         // Si se indica la postulación, se valida que sea TRAINEE y se liga el convenio a ella
@@ -401,46 +375,23 @@ public class RecruiterService {
                 ". Por favor, revisa el documento y aprueba la solicitud.";
         notificationService.createNotification(institution.getUser(), notifTitle, notifContent);
 
-        return AgreementResponseDTO.builder()
-                .id(agreement.getId())
-                .jobApplicationId(agreement.getJobApplication() != null ? agreement.getJobApplication().getId() : null)
-                .title(agreement.getTitle())
-                .companyName(recruiter.getCompanyName())
-                .studentName(postulant.getFirstName() + " " + postulant.getLastName())
-                .startDate(agreement.getStartDate())
-                .endDate(agreement.getEndDate())
-                .weeklyHours(agreement.getWeeklyHours())
-                .documentUrl(agreement.getDocumentUrl())
-                .status(agreement.getStatus())
-                .observations(agreement.getObservations())
-                .createdAt(agreement.getCreatedAt()) // Asegúrate de que el @PrePersist de tu entidad le asigne valor
-                .build();
+        return institutionService.mapAgreementToDTO(agreement);
     }
 
     @Transactional(readOnly = true)
     public List<AgreementResponseDTO> getMyAgreements(String email) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        RecruiterProfile recruiter = recruiterRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new RuntimeException("Perfil de reclutador no encontrado"));
+        RecruiterProfile recruiter = findRecruiterByEmail(email);
 
         return internshipAgreementRepository.findByRecruiterProfileIdOrderByCreatedAtDesc(recruiter.getId())
                 .stream()
-                .map(agreement -> AgreementResponseDTO.builder()
-                        .id(agreement.getId())
-                        .jobApplicationId(agreement.getJobApplication() != null ? agreement.getJobApplication().getId() : null)
-                        .title(agreement.getTitle())
-                        .companyName(recruiter.getCompanyName())
-                        .studentName(agreement.getPostulantProfile().getFirstName() + " " + agreement.getPostulantProfile().getLastName())
-                        .startDate(agreement.getStartDate())
-                        .endDate(agreement.getEndDate())
-                        .weeklyHours(agreement.getWeeklyHours())
-                        .documentUrl(agreement.getDocumentUrl())
-                        .status(agreement.getStatus())
-                        .observations(agreement.getObservations())
-                        .reviewedAt(agreement.getReviewedAt())
-                        .createdAt(agreement.getCreatedAt())
-                        .build())
+                .map(institutionService::mapAgreementToDTO)
                 .toList();
+    }
+
+    private RecruiterProfile findRecruiterByEmail(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
+        return recruiterRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Perfil de reclutador no encontrado"));
     }
 }

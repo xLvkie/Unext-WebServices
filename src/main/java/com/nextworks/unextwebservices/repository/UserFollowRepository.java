@@ -10,8 +10,6 @@ import java.util.UUID;
 
 @Repository
 public interface UserFollowRepository extends JpaRepository<UserFollow, UUID> {
-    boolean existsByFollowerIdAndFollowedId(UUID followerId, UUID followedId);
     Optional<UserFollow> findByFollowerIdAndFollowedId(UUID followerId, UUID followedId);
     List<UserFollow> findByFollowerIdOrderByCreatedAtDesc(UUID followerId);
-    long countByFollowerId(UUID followerId);
 }

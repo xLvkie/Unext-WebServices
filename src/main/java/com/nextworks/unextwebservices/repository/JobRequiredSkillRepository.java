@@ -11,8 +11,6 @@ import java.util.UUID;
 
 @Repository
 public interface JobRequiredSkillRepository extends JpaRepository<JobRequiredSkill, UUID> {
-    List<JobRequiredSkill> findByJobOfferId(UUID jobOfferId);
-
     @Query("SELECT DISTINCT s.name FROM JobRequiredSkill s WHERE LOWER(s.name) LIKE LOWER(CONCAT('%', :query, '%')) ORDER BY s.name")
     List<String> suggestNames(@Param("query") String query);
 }

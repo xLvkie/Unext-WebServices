@@ -4,6 +4,7 @@ import com.nextworks.unextwebservices.entity.enums.ExperienceLevel;
 import com.nextworks.unextwebservices.entity.enums.JobModality;
 import jakarta.persistence.*;
 import lombok.*;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -48,10 +49,10 @@ public class JobOffer {
     private ExperienceLevel experienceLevel;
 
     @Column(name = "min_salary")
-    private java.math.BigDecimal minSalary;
+    private BigDecimal minSalary;
 
     @Column(name = "max_salary")
-    private java.math.BigDecimal maxSalary;
+    private BigDecimal maxSalary;
 
     @Column(name = "is_active", nullable = false)
     private Boolean isActive;
