@@ -7,8 +7,10 @@ import com.nextworks.unextwebservices.entity.*;
 import com.nextworks.unextwebservices.entity.enums.ValidationStatus;
 import com.nextworks.unextwebservices.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.UUID;
@@ -29,24 +31,22 @@ public class ValidationService {
     // ============================================================== */
     @Transactional
     public ValidationResponseDTO requestValidation(String email, ValidationRequestDTO request) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-
-        PostulantProfile postulant = postulantRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new RuntimeException("Perfil de postulante no encontrado"));
+        PostulantProfile postulant = findPostulantByEmail(email);
 
         if (!Boolean.TRUE.equals(postulant.getIsInstitutionVerified())) {
-            throw new RuntimeException("HTTP 403: Primero debes verificar tu vínculo académico con una institución para poder certificar tus habilidades.");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Primero debes verificar tu vínculo académico con una institución para poder certificar tus habilidades.");
         }
 
         InstitutionProfile institution = institutionRepository.findById(request.getInstitutionProfileId())
-                .orElseThrow(() -> new RuntimeException("Institución no encontrada"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Institución no encontrada"));
 
         StudentSkill skill = studentSkillRepository.findById(request.getTechnicalSkillId())
-                .orElseThrow(() -> new RuntimeException("Habilidad no encontrada"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Habilidad no encontrada"));
 
         if (!skill.getPostulantProfile().getId().equals(postulant.getId())) {
-            throw new RuntimeException("No puedes validar una habilidad que no está en tu perfil.");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "No puedes validar una habilidad que no está en tu perfil.");
         }
 
         AcademicValidation validation = AcademicValidation.builder()
@@ -59,7 +59,6 @@ public class ValidationService {
 
         validationRepository.save(validation);
 
-        // Gatillo de notificación hacia la institución (PEDIENTE EN EL FRONTEND)
         User institutionUser = institution.getUser();
         String notifTitle = "Nueva validación de habilidad recibida";
         String notifContent = "El postulante " + postulant.getFirstName() + " " + postulant.getLastName() +
@@ -71,11 +70,7 @@ public class ValidationService {
 
     @Transactional(readOnly = true)
     public List<ValidationResponseDTO> getMyValidations(String email) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-
-        PostulantProfile postulant = postulantRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new RuntimeException("Perfil de postulante no encontrado"));
+        PostulantProfile postulant = findPostulantByEmail(email);
 
         return validationRepository.findByPostulantProfileId(postulant.getId()).stream()
                 .map(this::mapToDTO)
@@ -87,14 +82,10 @@ public class ValidationService {
     // ============================================================== */
     @Transactional
     public String requestAcademicVerification(String email, AcademicVerificationRequestDTO request) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-
-        PostulantProfile postulant = postulantRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new RuntimeException("Perfil de postulante no encontrado"));
+        PostulantProfile postulant = findPostulantByEmail(email);
 
         InstitutionProfile institution = institutionRepository.findById(request.getInstitutionProfileId())
-                .orElseThrow(() -> new RuntimeException("Institución no encontrada"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Institución no encontrada"));
 
         postulant.setInstitutionProfile(institution);
         postulant.setIsInstitutionVerified(false);
@@ -105,7 +96,8 @@ public class ValidationService {
             if (request.getStudentCode() == null || request.getStudentCode().isBlank() ||
                     request.getCareer() == null || request.getCareer().isBlank() ||
                     request.getInstitutionalEmail() == null || request.getInstitutionalEmail().isBlank()) {
-                throw new RuntimeException("HTTP 400: Para estudiantes activos, el correo institucional, código y carrera son obligatorios.");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Para estudiantes activos, el correo institucional, código y carrera son obligatorios.");
             }
             postulant.setHasUniversityBase(true);
             postulant.setInstitutionalEmail(request.getInstitutionalEmail().trim());
@@ -115,7 +107,8 @@ public class ValidationService {
         } else {
             // Caso 1: Egresado / Ya terminó su carrera (Valida mediante documento/diploma)
             if (request.getAcademicEvidenceUrl() == null || request.getAcademicEvidenceUrl().isBlank()) {
-                throw new RuntimeException("HTTP 400: Debes adjuntar tu constancia de egreso, bachiller o carné como documento de sustento.");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Debes adjuntar tu constancia de egreso, bachiller o carné como documento de sustento.");
             }
             postulant.setHasUniversityBase(false);
             postulant.setAcademicEvidenceUrl(request.getAcademicEvidenceUrl());
@@ -128,7 +121,6 @@ public class ValidationService {
 
         postulantRepository.save(postulant);
 
-        // Gatillo de notificación para la institución (FALTA AGREGAR EN EL FRONTEND)
         notificationService.createNotification(
                 institution.getUser(),
                 "Nueva solicitud de verificación académica",
@@ -141,20 +133,23 @@ public class ValidationService {
 
     @Transactional
     public String linkInstitution(String email, UUID institutionId) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-
-        PostulantProfile postulant = postulantRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new RuntimeException("Perfil de postulante no encontrado"));
+        PostulantProfile postulant = findPostulantByEmail(email);
 
         InstitutionProfile institution = institutionRepository.findById(institutionId)
-                .orElseThrow(() -> new RuntimeException("Institución no encontrada"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Institución no encontrada"));
 
         postulant.setInstitutionProfile(institution);
         postulant.setIsInstitutionVerified(false);
         postulantRepository.save(postulant);
 
         return "Solicitud de vinculación enviada exitosamente a la institución.";
+    }
+
+    private PostulantProfile findPostulantByEmail(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
+        return postulantRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Perfil de postulante no encontrado"));
     }
 
     private ValidationResponseDTO mapToDTO(AcademicValidation val) {

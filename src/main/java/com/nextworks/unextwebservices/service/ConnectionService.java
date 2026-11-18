@@ -13,9 +13,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -29,6 +35,7 @@ public class ConnectionService {
     private final JobApplicationRepository jobApplicationRepository;
     private final NotificationService notificationService;
     private final UserFollowRepository followRepository;
+    private final ProfileService profileService;
 
     @Transactional(readOnly = true)
     public ConnectionStatusResponseDTO getStatusWithUser(String currentEmail, UUID targetUserId) {
@@ -111,8 +118,8 @@ public class ConnectionService {
                 targetUser,
                 autoAccept ? "¡Nueva conexión corporativa!" : "Nueva solicitud para conectar en tu red",
                 autoAccept
-                        ? resolveDisplayName(currentUser) + " se ha conectado contigo para conversar por mensajería."
-                        : resolveDisplayName(currentUser) + " desea conectar contigo en Unext."
+                        ? profileService.resolveDisplayName(currentUser) + " se ha conectado contigo para conversar por mensajería."
+                        : profileService.resolveDisplayName(currentUser) + " desea conectar contigo en Unext."
         );
 
         return ConnectionStatusResponseDTO.builder()
@@ -141,7 +148,7 @@ public class ConnectionService {
         notificationService.createNotification(
                 conn.getRequester(),
                 "¡Solicitud de conexión aceptada!",
-                resolveDisplayName(currentUser) + " aceptó tu solicitud de conexión. Ya forman parte de la misma red."
+                profileService.resolveDisplayName(currentUser) + " aceptó tu solicitud de conexión. Ya forman parte de la misma red."
         );
 
         return ConnectionStatusResponseDTO.builder()
@@ -182,20 +189,20 @@ public class ConnectionService {
 
         // Usuarios seguidos
         List<UserFollow> followList = followRepository.findByFollowerIdOrderByCreatedAtDesc(myUserId);
-        java.util.Set<UUID> followedUserIds = followList.stream()
+        Set<UUID> followedUserIds = followList.stream()
                 .map(f -> f.getFollowed().getId())
-                .collect(java.util.stream.Collectors.toSet());
+                .collect(Collectors.toSet());
 
         List<NetworkPersonCardDTO> receivedDTOs = receivedList.stream()
                 .map(c -> buildPersonCard(currentUser, c.getRequester(), c.getId(), "PENDING_RECEIVED",
                         followedUserIds.contains(c.getRequester().getId()), c.getCreatedAt()))
-                .filter(java.util.Objects::nonNull)
+                .filter(Objects::nonNull)
                 .toList();
 
         List<NetworkPersonCardDTO> sentDTOs = sentList.stream()
                 .map(c -> buildPersonCard(currentUser, c.getAddressee(), c.getId(), "PENDING_SENT",
                         followedUserIds.contains(c.getAddressee().getId()), c.getCreatedAt()))
-                .filter(java.util.Objects::nonNull)
+                .filter(Objects::nonNull)
                 .toList();
 
         List<NetworkPersonCardDTO> connectionsDTOs = acceptedList.stream()
@@ -204,7 +211,7 @@ public class ConnectionService {
                     return buildPersonCard(currentUser, other, c.getId(), "CONNECTED",
                             followedUserIds.contains(other.getId()), c.getCreatedAt());
                 })
-                .filter(java.util.Objects::nonNull)
+                .filter(Objects::nonNull)
                 .toList();
 
         List<NetworkPersonCardDTO> followingDTOs = followList.stream()
@@ -217,18 +224,18 @@ public class ConnectionService {
                     UUID connId = conn.map(UserConnection::getId).orElse(null);
                     return buildPersonCard(currentUser, target, connId, status, true, f.getCreatedAt());
                 })
-                .filter(java.util.Objects::nonNull)
+                .filter(Objects::nonNull)
                 .toList();
 
         // IDs que ya tienen vínculo activo (para no repetirlos en Recomendaciones de conexión)
-        java.util.Set<UUID> excludedFromRecs = new java.util.HashSet<>();
+        Set<UUID> excludedFromRecs = new HashSet<>();
         excludedFromRecs.add(myUserId);
         receivedDTOs.forEach(d -> excludedFromRecs.add(d.getUserId()));
         sentDTOs.forEach(d -> excludedFromRecs.add(d.getUserId()));
         connectionsDTOs.forEach(d -> excludedFromRecs.add(d.getUserId()));
 
         // Recomendaciones (Postulantes verificados, Empresas verificadas e Instituciones verificadas)
-        java.util.List<NetworkPersonCardDTO> recommendations = new java.util.ArrayList<>();
+        List<NetworkPersonCardDTO> recommendations = new ArrayList<>();
 
         postulantRepository.findByIsVerifiedTrue().forEach(p -> {
             UUID uid = p.getUser().getId();
@@ -302,7 +309,7 @@ public class ConnectionService {
             UUID connectionId,
             String connectionStatus,
             boolean isFollowing,
-            java.time.LocalDateTime createdAt
+            LocalDateTime createdAt
     ) {
         String restriction = evaluateConnectionRestriction(currentUser, targetUser);
 
@@ -448,19 +455,5 @@ public class ConnectionService {
         }
 
         return null;
-    }
-
-    private String resolveDisplayName(User user) {
-        return switch (user.getRole()) {
-            case POSTULANT -> postulantRepository.findByUserId(user.getId())
-                    .map(p -> p.getFirstName() + " " + p.getLastName())
-                    .orElse(user.getEmail());
-            case RECRUITER -> recruiterRepository.findByUserId(user.getId())
-                    .map(RecruiterProfile::getCompanyName)
-                    .orElse(user.getEmail());
-            case INSTITUTION -> institutionRepository.findByUserId(user.getId())
-                    .map(InstitutionProfile::getName)
-                    .orElse(user.getEmail());
-        };
     }
 }

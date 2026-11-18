@@ -3,6 +3,7 @@ package com.nextworks.unextwebservices.controller;
 import com.nextworks.unextwebservices.dto.directory.InstitutionDirectoryResponseDTO;
 import com.nextworks.unextwebservices.dto.directory.PostulantDirectoryResponseDTO;
 import com.nextworks.unextwebservices.dto.directory.RecruiterDirectoryResponseDTO;
+import com.nextworks.unextwebservices.dto.job.JobOfferResponseDTO;
 import com.nextworks.unextwebservices.dto.profile.*;
 import com.nextworks.unextwebservices.entity.User;
 
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.security.core.Authentication;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Tag(name = "2. Perfiles y Habilidades", description = "Gestión de perfiles de usuario y habilidades estudiantiles")
@@ -89,13 +91,13 @@ public class ProfileController {
 
     @PreAuthorize("hasAnyAuthority('RECRUITER', 'INSTITUTION')")
     @PostMapping("/organization/resend-code")
-    public ResponseEntity<java.util.Map<String, String>> resendOrganizationCode(
+    public ResponseEntity<Map<String, String>> resendOrganizationCode(
             Authentication authentication) {
 
         User user = (User) authentication.getPrincipal();
         assert user != null;
         String newCode = profileService.regenerateOrganizationOtp(user.getEmail());
-        return ResponseEntity.ok(java.util.Map.of(
+        return ResponseEntity.ok(Map.of(
                 "message", "Se ha generado un nuevo código de seguridad y se envió a tu bandeja de notificaciones.",
                 "code", newCode
         ));
@@ -250,10 +252,7 @@ public class ProfileController {
     // =========================== */
     @PreAuthorize("hasAnyAuthority('RECRUITER', 'INSTITUTION', 'POSTULANT')")
     @GetMapping("/postulants/directory")
-    public ResponseEntity<List<PostulantDirectoryResponseDTO>> getAllPostulants(Authentication authentication) {
-        User user = (User) authentication.getPrincipal();
-        assert user != null;
-
+    public ResponseEntity<List<PostulantDirectoryResponseDTO>> getAllPostulants() {
         return ResponseEntity.ok(profileService.getAllPostulants());
         /*
         Devuelve el directorio público de todos los estudiantes de la plataforma.
@@ -304,7 +303,7 @@ public class ProfileController {
 
     @PreAuthorize("hasAnyAuthority('RECRUITER', 'INSTITUTION', 'POSTULANT')")
     @GetMapping("/recruiters/directory/{recruiterId}/jobs")
-    public ResponseEntity<List<com.nextworks.unextwebservices.dto.job.JobOfferResponseDTO>> getPublicRecruiterJobs(
+    public ResponseEntity<List<JobOfferResponseDTO>> getPublicRecruiterJobs(
             @PathVariable UUID recruiterId) {
         return ResponseEntity.ok(profileService.getPublicJobsByRecruiter(recruiterId));
     }

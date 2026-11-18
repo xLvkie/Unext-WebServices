@@ -11,8 +11,10 @@ import com.nextworks.unextwebservices.entity.enums.ReportStatus;
 import com.nextworks.unextwebservices.entity.enums.ReviewStatus;
 import com.nextworks.unextwebservices.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -40,17 +42,17 @@ public class ReviewService {
     @Transactional
     public ReviewResponseDTO saveReview(String email, ReviewRequestDTO request) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
         RecruiterProfile recruiter = recruiterRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new RuntimeException("Perfil de reclutador no encontrado"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Perfil de reclutador no encontrado"));
         InternshipAgreement agreement = agreementRepository.findById(request.getAgreementId())
-                .orElseThrow(() -> new RuntimeException("Convenio no encontrado"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Convenio no encontrado"));
 
         if (!agreement.getRecruiterProfile().getId().equals(recruiter.getId())) {
-            throw new RuntimeException("No puedes calificar un convenio que no te pertenece");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No puedes calificar un convenio que no te pertenece");
         }
         if (!isContractFinished(agreement)) {
-            throw new RuntimeException(CONTRACT_NOT_FINISHED);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, CONTRACT_NOT_FINISHED);
         }
 
         boolean publish = Boolean.TRUE.equals(request.getPublish());
@@ -59,10 +61,11 @@ public class ReviewService {
                 .orElse(null);
 
         if (review != null && review.getStatus() == ReviewStatus.PUBLISHED) {
-            throw new RuntimeException("Ya publicaste una reseña para este convenio");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Ya publicaste una reseña para este convenio");
         }
         if (review != null && review.getStatus() == ReviewStatus.HIDDEN) {
-            throw new RuntimeException("Esta reseña está oculta por un reporte y no se puede volver a publicar");
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Esta reseña está oculta por un reporte y no se puede volver a publicar");
         }
 
         if (review == null) {
@@ -82,21 +85,21 @@ public class ReviewService {
     @Transactional(readOnly = true)
     public ReputationResponseDTO getMyReputation(String email, Integer stars) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
         PostulantProfile postulant = postulantRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new RuntimeException("Perfil de postulante no encontrado"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Perfil de postulante no encontrado"));
 
         List<Review> published = reviewRepository.findByPostulantProfileIdAndStatusOrderByCreatedAtDesc(
                 postulant.getId(), ReviewStatus.PUBLISHED);
         if (published.isEmpty()) {
-            throw new RuntimeException(NO_REVIEWS);
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, NO_REVIEWS);
         }
 
         List<Review> visible = stars == null
                 ? published
                 : published.stream().filter(review -> review.getStars().equals(stars)).toList();
         if (stars != null && visible.isEmpty()) {
-            throw new RuntimeException(NO_REVIEWS_FOR_STARS);
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, NO_REVIEWS_FOR_STARS);
         }
 
         double average = published.stream().mapToInt(Review::getStars).average().orElse(0);
@@ -121,15 +124,16 @@ public class ReviewService {
     @Transactional
     public ReportResponseDTO reportReview(String email, UUID reviewId, ReportRequestDTO request) {
         User reporter = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
         Review review = reviewRepository.findById(reviewId)
-                .orElseThrow(() -> new RuntimeException("Reseña no encontrada"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reseña no encontrada"));
 
         if (review.getStatus() == ReviewStatus.DRAFT) {
-            throw new RuntimeException("No se puede reportar una reseña que aún es borrador");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "No se puede reportar una reseña que aún es borrador");
         }
         if (review.getRecruiterProfile().getUser().getId().equals(reporter.getId())) {
-            throw new RuntimeException(OWN_REVIEW);
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, OWN_REVIEW);
         }
 
         ReviewReport report = reportRepository.save(ReviewReport.builder()
@@ -151,15 +155,15 @@ public class ReviewService {
     @Transactional
     public String cancelReport(String email, UUID reportId) {
         User reporter = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
         ReviewReport report = reportRepository.findById(reportId)
-                .orElseThrow(() -> new RuntimeException("Reporte no encontrado"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reporte no encontrado"));
 
         if (!report.getReporter().getId().equals(reporter.getId())) {
-            throw new RuntimeException("No puedes cancelar un reporte que no enviaste");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No puedes cancelar un reporte que no enviaste");
         }
         if (report.getStatus() != ReportStatus.PENDING) {
-            throw new RuntimeException("Este reporte ya no se puede cancelar");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Este reporte ya no se puede cancelar");
         }
 
         report.setStatus(ReportStatus.CANCELLED);
@@ -184,8 +188,8 @@ public class ReviewService {
                 .id(review.getId())
                 .agreementId(review.getInternshipAgreement().getId())
                 .companyName(review.getRecruiterProfile().getCompanyName())
-                .postulantName(review.getPostulantProfile().getFirstName() + " "
-                        + review.getPostulantProfile().getLastName())
+                .postulantName((review.getPostulantProfile().getFirstName() + " "
+                        + review.getPostulantProfile().getLastName()).trim())
                 .stars(review.getStars())
                 .comment(review.getComment())
                 .status(review.getStatus())

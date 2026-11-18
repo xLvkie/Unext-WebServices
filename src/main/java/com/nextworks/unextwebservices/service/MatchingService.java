@@ -12,8 +12,10 @@ import com.nextworks.unextwebservices.repository.PostulantProfileRepository;
 import com.nextworks.unextwebservices.repository.StudentSkillRepository;
 import com.nextworks.unextwebservices.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -67,7 +69,7 @@ public class MatchingService {
     public void replaceRequiredSkills(JobOffer offer, List<String> rawNames) {
         List<String> names = normalizeSkillNames(rawNames);
         if (names.isEmpty()) {
-            throw new RuntimeException("Debes agregar al menos una habilidad requerida");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Debes agregar al menos una habilidad requerida");
         }
         if (offer.getRequiredSkills() == null) {
             offer.setRequiredSkills(new ArrayList<>());
@@ -181,22 +183,26 @@ public class MatchingService {
     @Transactional(readOnly = true)
     public List<JobRecommendationResponseDTO> getRecommendations(String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
         PostulantProfile profile = postulantRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new RuntimeException("Perfil de postulante no encontrado"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Perfil de postulante no encontrado"));
 
         List<String> skills = studentSkillNames(profile);
         if (skills.isEmpty()) {
-            throw new RuntimeException(INCOMPLETE_PROFILE_MESSAGE);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, INCOMPLETE_PROFILE_MESSAGE);
         }
 
         Set<UUID> dismissed = dismissedRepository.findByPostulantProfileId(profile.getId()).stream()
                 .map(item -> item.getJobOffer().getId())
                 .collect(Collectors.toSet());
 
+        Set<UUID> appliedJobIds = applicationRepository.findByPostulantProfileId(profile.getId()).stream()
+                .map(app -> app.getJobOffer().getId())
+                .collect(Collectors.toSet());
+
         return jobOfferRepository.findByIsActiveTrue().stream()
                 .filter(offer -> !dismissed.contains(offer.getId()))
-                .filter(offer -> !applicationRepository.existsByJobOfferIdAndPostulantProfileId(offer.getId(), profile.getId()))
+                .filter(offer -> !appliedJobIds.contains(offer.getId()))
                 .map(offer -> {
                     MatchResult match = evaluate(skills, requiredSkillNames(offer));
                     return new OfferMatch(offer, match);
@@ -225,11 +231,11 @@ public class MatchingService {
     @Transactional
     public String dismissRecommendation(String email, UUID jobId) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
         PostulantProfile profile = postulantRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new RuntimeException("Perfil de postulante no encontrado"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Perfil de postulante no encontrado"));
         JobOffer offer = jobOfferRepository.findById(jobId)
-                .orElseThrow(() -> new RuntimeException("Vacante no encontrada"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Vacante no encontrada"));
 
         if (dismissedRepository.existsByPostulantProfileIdAndJobOfferId(profile.getId(), offer.getId())) {
             return "Esta vacante ya no aparecerá en tus recomendaciones.";

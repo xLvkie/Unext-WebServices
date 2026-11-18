@@ -17,7 +17,6 @@ public interface InternshipAgreementRepository extends JpaRepository<InternshipA
     List<InternshipAgreement> findByInstitutionProfileIdOrderByCreatedAtDesc(UUID institutionId);
     // Listar convenios filtrados por su estado
     List<InternshipAgreement> findByInstitutionProfileIdAndStatusOrderByCreatedAtDesc(UUID institutionId, AgreementStatus status);
-    long countByInstitutionProfileIdAndStatus(UUID institutionId, AgreementStatus status);
 
     @Query("SELECT COUNT(a) FROM InternshipAgreement a WHERE a.institutionProfile.id = :institutionId " +
             "AND a.status = :status AND (:career = '' OR LOWER(TRIM(a.postulantProfile.career)) = :career)")

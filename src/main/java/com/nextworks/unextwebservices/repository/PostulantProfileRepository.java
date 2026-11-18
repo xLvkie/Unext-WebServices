@@ -18,11 +18,6 @@ public interface PostulantProfileRepository extends JpaRepository<PostulantProfi
     Optional<PostulantProfile> findByIdAndIsVerifiedTrue(UUID id);
     List<PostulantProfile> findByIsVerifiedTrue();
     List<PostulantProfile> findByInstitutionProfileIdAndIsInstitutionVerifiedFalse(UUID institutionId);
-    long countByInstitutionProfileIdAndIsInstitutionVerifiedTrue(UUID institutionId);
-    long countByInstitutionProfileIdAndCareerIgnoreCase(UUID institutionId, String career);
-    long countByInstitutionProfileIdAndIsInstitutionVerifiedTrueAndCareerIgnoreCase(UUID institutionId, String career);
-    @Query("SELECT COUNT(DISTINCT p.id) FROM PostulantProfile p JOIN JobApplication a ON p.id = a.postulantProfile.id WHERE p.institutionProfile.id = :institutionId AND a.status = 'ACCEPTED'")
-    long countHiredStudentsByInstitutionId(@Param("institutionId") UUID institutionId);
 
     // Dashboard: career llega ya normalizado (trim + minusculas); cadena vacia = sin filtro
     @Query("SELECT COUNT(p) FROM PostulantProfile p WHERE p.institutionProfile.id = :institutionId " +

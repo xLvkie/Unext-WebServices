@@ -7,8 +7,11 @@ import com.nextworks.unextwebservices.entity.User;
 import com.nextworks.unextwebservices.repository.UserRepository;
 import com.nextworks.unextwebservices.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
@@ -18,10 +21,11 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
 
+    @Transactional
     public AuthResponseDTO register(RegisterRequestDTO request) {
         // 1. Validar que el correo no exista
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("El correo ya está registrado en el sistema");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "El correo ya está registrado en el sistema");
         }
 
         // 2. Crear la entidad User mapeando los datos del DTO
@@ -49,14 +53,15 @@ public class AuthService {
                 .build();
     }
 
+    @Transactional(readOnly = true)
     public AuthResponseDTO login(LoginRequestDTO request) {
         // 1. Buscar al usuario por correo
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("Credenciales incorrectas"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Credenciales incorrectas"));
 
         // 2. Verificar que la contraseña encriptada coincida
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-            throw new RuntimeException("Credenciales incorrectas");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Credenciales incorrectas");
         }
 
         // 3. Generar Token JWT

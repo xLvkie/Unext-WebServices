@@ -11,8 +11,10 @@ import com.nextworks.unextwebservices.repository.JobOfferRepository;
 import com.nextworks.unextwebservices.repository.PostulantProfileRepository;
 import com.nextworks.unextwebservices.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.UUID;
@@ -44,20 +46,20 @@ public class JobService {
     @Transactional
     public ApplicationResponseDTO applyToJob(String email, UUID jobId) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
 
         PostulantProfile profile = postulantRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new RuntimeException("Perfil no encontrado"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Perfil no encontrado"));
 
         JobOffer offer = jobOfferRepository.findById(jobId)
-                .orElseThrow(() -> new RuntimeException("Vacante no encontrada"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Vacante no encontrada"));
 
-        if (!offer.getIsActive()) {
-            throw new RuntimeException("Esta vacante ya no acepta postulaciones");
+        if (!Boolean.TRUE.equals(offer.getIsActive())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Esta vacante ya no acepta postulaciones");
         }
 
         if (applicationRepository.existsByJobOfferIdAndPostulantProfileId(offer.getId(), profile.getId())) {
-            throw new RuntimeException("Ya has postulado a esta vacante anteriormente");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Ya has postulado a esta vacante anteriormente");
         }
 
         JobApplication application = JobApplication.builder()
@@ -72,33 +74,19 @@ public class JobService {
         String notifContent = "Tienes un nuevo candidato para la vacante: " + offer.getTitle();
         notificationService.createNotification(recruiterUser, notifTitle, notifContent);
 
-        return ApplicationResponseDTO.builder()
-                .id(application.getId())
-                .jobTitle(offer.getTitle())
-                .companyName(offer.getRecruiterProfile().getCompanyName())
-                .status(application.getStatus())
-                .appliedAt(application.getCreatedAt())
-                .build();
+        return toApplicationDTO(application);
     }
 
     @Transactional(readOnly = true)
     public List<ApplicationResponseDTO> getMyApplications(String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
 
         PostulantProfile profile = postulantRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new RuntimeException("Perfil de postulante no encontrado"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Perfil de postulante no encontrado"));
 
-        List<JobApplication> applications = applicationRepository.findByPostulantProfileId(profile.getId());
-
-        return applications.stream()
-                .map(application -> ApplicationResponseDTO.builder()
-                        .id(application.getId()) // ¡Este es el ID de la postulación que el chat necesita!
-                        .jobTitle(application.getJobOffer().getTitle())
-                        .companyName(application.getJobOffer().getRecruiterProfile().getCompanyName())
-                        .status(application.getStatus())
-                        .appliedAt(application.getCreatedAt())
-                        .build())
+        return applicationRepository.findByPostulantProfileId(profile.getId()).stream()
+                .map(this::toApplicationDTO)
                 .toList();
     }
 
@@ -115,5 +103,16 @@ public class JobService {
     @Transactional
     public String dismissRecommendation(String email, UUID jobId) {
         return matchingService.dismissRecommendation(email, jobId);
+    }
+
+    private ApplicationResponseDTO toApplicationDTO(JobApplication application) {
+        JobOffer offer = application.getJobOffer();
+        return ApplicationResponseDTO.builder()
+                .id(application.getId())
+                .jobTitle(offer.getTitle())
+                .companyName(offer.getRecruiterProfile().getCompanyName())
+                .status(application.getStatus())
+                .appliedAt(application.getCreatedAt())
+                .build();
     }
 }

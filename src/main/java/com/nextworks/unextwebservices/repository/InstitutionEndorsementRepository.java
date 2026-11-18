@@ -10,10 +10,8 @@ import java.util.UUID;
 
 @Repository
 public interface InstitutionEndorsementRepository extends JpaRepository<InstitutionEndorsement, UUID> {
-    boolean existsByInstitutionProfileIdAndRecruiterProfileId(UUID institutionId, UUID recruiterId);
     // Busca la fila del par institucion-empresa sin importar si esta activa o revocada (para reactivarla)
     Optional<InstitutionEndorsement> findByInstitutionProfileIdAndRecruiterProfileId(UUID institutionId, UUID recruiterId);
-    List<InstitutionEndorsement> findByInstitutionProfileId(UUID institutionId);
     long countByInstitutionProfileId(UUID institutionId);
     // Solo acreditaciones activas (no revocadas)
     List<InstitutionEndorsement> findByInstitutionProfileIdAndRevokedAtIsNull(UUID institutionId);

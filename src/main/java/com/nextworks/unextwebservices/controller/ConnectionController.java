@@ -1,6 +1,7 @@
 package com.nextworks.unextwebservices.controller;
 
 import com.nextworks.unextwebservices.dto.connection.ConnectionStatusResponseDTO;
+import com.nextworks.unextwebservices.dto.connection.NetworkOverviewDTO;
 import com.nextworks.unextwebservices.entity.User;
 import com.nextworks.unextwebservices.service.ConnectionService;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -10,6 +11,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
 import java.util.UUID;
 
 @Tag(name = "12. Red y Conexiones", description = "Gestión de conexiones profesionales entre usuarios")
@@ -63,7 +65,7 @@ public class ConnectionController {
 
     @PreAuthorize("hasAnyAuthority('POSTULANT', 'RECRUITER', 'INSTITUTION')")
     @GetMapping("/overview")
-    public ResponseEntity<com.nextworks.unextwebservices.dto.connection.NetworkOverviewDTO> getNetworkOverview(
+    public ResponseEntity<NetworkOverviewDTO> getNetworkOverview(
             Authentication authentication) {
         User user = (User) authentication.getPrincipal();
         assert user != null;
@@ -72,12 +74,12 @@ public class ConnectionController {
 
     @PreAuthorize("hasAnyAuthority('POSTULANT', 'RECRUITER', 'INSTITUTION')")
     @PostMapping("/follow/{targetUserId}")
-    public ResponseEntity<java.util.Map<String, Boolean>> toggleFollow(
+    public ResponseEntity<Map<String, Boolean>> toggleFollow(
             Authentication authentication,
             @PathVariable UUID targetUserId) {
         User user = (User) authentication.getPrincipal();
         assert user != null;
         boolean following = connectionService.toggleFollow(user.getEmail(), targetUserId);
-        return ResponseEntity.ok(java.util.Map.of("following", following));
+        return ResponseEntity.ok(Map.of("following", following));
     }
 }
